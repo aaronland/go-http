@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/senseyeio/duration"	
+	"github.com/senseyeio/duration"
 )
 
 // https://github.com/golang/go/issues/25194

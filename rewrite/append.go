@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"	
+	"golang.org/x/net/html/atom"
 )
 
 // AppendResourcesOptions is a struct containing configuration options for the `AppendResourcesHandler` method.

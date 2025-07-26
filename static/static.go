@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/aaronland/go-http/v3/rewrite"	
+	"github.com/aaronland/go-http/v3/rewrite"
 )
 
 func StaticAssetsHandler(static_fs fs.FS) (http.Handler, error) {

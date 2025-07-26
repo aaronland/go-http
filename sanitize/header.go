@@ -4,7 +4,7 @@ import (
 	go_http "net/http"
 	"strconv"
 
-	wof_sanitize "github.com/whosonfirst/go-sanitize"	
+	wof_sanitize "github.com/whosonfirst/go-sanitize"
 )
 
 func HeaderString(req *go_http.Request, param string) (string, error) {

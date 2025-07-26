@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/rs/cors"	
+	"github.com/rs/cors"
 )
 
 type FileServerOptions struct {

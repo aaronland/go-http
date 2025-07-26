@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	go_http "net/http"
 
+	"github.com/aaronland/go-http/v3/fault"
 	"github.com/aaronland/go-http/v3/rewrite"
 	"github.com/aaronland/go-http/v3/sanitize"
-	"github.com/aaronland/go-http/v3/fault"
 )
 
 // EnsureCrumbHandler wraps 'next_handler' with a middleware `http.Handler` for assigning and validating

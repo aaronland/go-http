@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"golang.org/x/net/html"	
+	"golang.org/x/net/html"
 )
 
 func baseRewriteHandler() http.Handler {

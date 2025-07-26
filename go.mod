@@ -5,10 +5,15 @@ go 1.24.5
 require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/aaronland/go-roster v1.0.0
+	github.com/aaronland/go-secretbox v1.0.1
 	github.com/aaronland/go-string v1.0.0
+	github.com/akrylysov/algnhsa v1.1.0
+	github.com/awnumar/memguard v0.22.5
+	github.com/aws/aws-lambda-go v1.49.0
 	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/rs/cors v1.11.1
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
+	github.com/sfomuseum/go-flags v0.11.0
 	github.com/sfomuseum/runtimevar v1.3.2
 	github.com/whosonfirst/go-sanitize v0.1.0
 	golang.org/x/net v0.42.0
@@ -18,6 +23,7 @@ require (
 	github.com/aaronland/go-aws-auth v1.7.0 // indirect
 	github.com/aaronland/go-aws-auth/v2 v2.0.1 // indirect
 	github.com/aaronland/gocloud-blob v0.6.1 // indirect
+	github.com/awnumar/memcall v0.2.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.7 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.36.6 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.11 // indirect
@@ -57,6 +63,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	gocloud.dev v0.43.0 // indirect
+	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect

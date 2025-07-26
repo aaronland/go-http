@@ -2,7 +2,7 @@ package crumb
 
 import (
 	"fmt"
-	
+
 	"github.com/aaronland/go-http/v3/fault"
 )
 
