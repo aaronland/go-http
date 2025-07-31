@@ -10,7 +10,7 @@ require (
 	github.com/akrylysov/algnhsa v1.1.0
 	github.com/awnumar/memguard v0.22.5
 	github.com/aws/aws-lambda-go v1.49.0
-	github.com/golang-jwt/jwt/v5 v5.2.3
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/rs/cors v1.11.1
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
 	github.com/sfomuseum/go-flags v0.11.0
