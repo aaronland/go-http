@@ -269,6 +269,7 @@ github.com/senseyeio/duration
 # github.com/sfomuseum/go-flags v0.11.0
 ## explicit; go 1.22
 github.com/sfomuseum/go-flags/flagset
+github.com/sfomuseum/go-flags/multi
 # github.com/sfomuseum/runtimevar v1.3.2
 ## explicit; go 1.24.0
 github.com/sfomuseum/runtimevar
