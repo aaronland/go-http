@@ -75,7 +75,7 @@ func NewRandomEncryptedCookieURI(name string) (string, error) {
 
 // NewEncryptedCookie() returns a new `EncryptedCookie` instance derived from 'uri' which is expected to take the form of:
 //
-// 	encrypted://?name={NAME}&secret={SECRET}&salt={SECRET}
+//	encrypted://?name={NAME}&secret={SECRET}&salt={SECRET}
 //
 // Where `{NAME}` is the name of the cookie for all subsequent operations; `{SECRET}` is the secret key used to encrypt the value of the cookie; `{SALT}` is the salt used to encrypt the cookie.
 func NewEncryptedCookie(ctx context.Context, uri string) (Cookie, error) {

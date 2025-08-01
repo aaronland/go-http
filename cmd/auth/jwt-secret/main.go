@@ -32,5 +32,5 @@ func main() {
 	flag.IntVar(&length, "length", 256, "...")
 	flag.Parse()
 
-	fmt.Printf(String(length))
+	fmt.Printf("%s", String(length))
 }
