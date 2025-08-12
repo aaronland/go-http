@@ -6,7 +6,7 @@ Opinionated package of wrapper, helper and utility functions for working with HT
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/aaronland/go-http.svg)](https://pkg.go.dev/github.com/aaronland/go-http/v3)
 
-Documentation remains incomplete and many tests are lacking despite this being a "v3" release. Documentation, such as it is, can be found in the individual sub-packages.
+Documentation remains incomplete despite this being a "v3" release. Documentation, such as it is, can be found in the individual sub-packages.
 
 ## Motivation
 
