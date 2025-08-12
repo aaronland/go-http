@@ -1,4 +1,4 @@
-// encrypted returns a new URI suitable for instantiating an `EncryptedCrumb` instance.
+// encrypted-crumb returns a new URI suitable for instantiating an `EncryptedCrumb` instance.
 package main
 
 import (
