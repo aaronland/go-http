@@ -21,11 +21,11 @@ github.com/aaronland/gocloud/runtimevar
 # github.com/akrylysov/algnhsa v1.1.0
 ## explicit; go 1.18
 github.com/akrylysov/algnhsa
-# github.com/awnumar/memcall v0.2.0
-## explicit; go 1.12
-github.com/awnumar/memcall
-# github.com/awnumar/memguard v0.22.5
+# github.com/awnumar/memcall v0.4.0
 ## explicit; go 1.18
+github.com/awnumar/memcall
+# github.com/awnumar/memguard v0.23.0
+## explicit; go 1.23.1
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
 # github.com/aws/aws-lambda-go v1.49.0
@@ -268,7 +268,7 @@ github.com/senseyeio/duration
 ## explicit; go 1.22
 github.com/sfomuseum/go-flags/flagset
 github.com/sfomuseum/go-flags/multi
-# github.com/tdewolff/minify/v2 v2.24.0
+# github.com/tdewolff/minify/v2 v2.24.2
 ## explicit; go 1.17
 github.com/tdewolff/minify/v2
 github.com/tdewolff/minify/v2/css

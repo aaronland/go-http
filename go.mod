@@ -9,20 +9,20 @@ require (
 	github.com/aaronland/go-string v1.0.0
 	github.com/aaronland/gocloud v1.0.0
 	github.com/akrylysov/algnhsa v1.1.0
-	github.com/awnumar/memguard v0.22.5
+	github.com/awnumar/memguard v0.23.0
 	github.com/aws/aws-lambda-go v1.49.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/rs/cors v1.11.1
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
 	github.com/sfomuseum/go-flags v0.11.0
-	github.com/tdewolff/minify/v2 v2.24.0
+	github.com/tdewolff/minify/v2 v2.24.2
 	github.com/whosonfirst/go-sanitize v0.1.0
 	golang.org/x/net v0.43.0
 )
 
 require (
 	github.com/aaronland/go-aws/v3 v3.0.0 // indirect
-	github.com/awnumar/memcall v0.2.0 // indirect
+	github.com/awnumar/memcall v0.4.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.7 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.38.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.0 // indirect

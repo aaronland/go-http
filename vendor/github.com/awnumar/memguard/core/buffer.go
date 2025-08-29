@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"sync"
+	"unsafe"
 
 	"github.com/awnumar/memcall"
 )
@@ -58,15 +59,15 @@ func NewBuffer(size int) (*Buffer, error) {
 	}
 
 	// Construct slice reference for data buffer.
-	b.data = getBytes(&b.memory[pageSize+innerLen-size], size)
+	b.data = unsafe.Slice(&b.memory[pageSize+innerLen-size], size)
 
 	// Construct slice references for page sectors.
-	b.preguard = getBytes(&b.memory[0], pageSize)
-	b.inner = getBytes(&b.memory[pageSize], innerLen)
-	b.postguard = getBytes(&b.memory[pageSize+innerLen], pageSize)
+	b.preguard = unsafe.Slice(&b.memory[0], pageSize)
+	b.inner = unsafe.Slice(&b.memory[pageSize], innerLen)
+	b.postguard = unsafe.Slice(&b.memory[pageSize+innerLen], pageSize)
 
 	// Construct slice reference for canary portion of inner page.
-	b.canary = getBytes(&b.memory[pageSize], len(b.inner)-len(b.data))
+	b.canary = unsafe.Slice(&b.memory[pageSize], len(b.inner)-len(b.data))
 
 	// Lock the pages that will hold sensitive data.
 	if err := memcall.Lock(b.inner); err != nil {
@@ -249,6 +250,13 @@ func (b *Buffer) Mutable() bool {
 	b.RLock()
 	defer b.RUnlock()
 	return b.mutable
+}
+
+// isDestroyed returns true if the buffer is destroyed
+func (b *Buffer) isDestroyed() bool {
+	b.RLock()
+	defer b.RUnlock()
+	return b.data == nil
 }
 
 // BufferList stores a list of buffers in a thread-safe manner.
