@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/aaronland/go-http/v3/handlers"
-	"github.com/aaronland/go-http/v3/server"
+	"github.com/aaronland/go-http/v4/response"
+	"github.com/aaronland/go-http/v4/server"
 	"github.com/sfomuseum/go-flags/flagset"
 )
 
@@ -51,7 +51,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	index_handler := NewHandler()
-	index_handler = handlers.DisabledHandler(disabled, index_handler)
+	index_handler = response.DisabledHandler(disabled, index_handler)
 
 	mux.Handle("/", index_handler)
 

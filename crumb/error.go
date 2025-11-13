@@ -3,7 +3,7 @@ package crumb
 import (
 	"fmt"
 
-	"github.com/aaronland/go-http/v3/fault"
+	"github.com/aaronland/go-http/v4/fault"
 )
 
 // type ErrorClass defines application specific error classes (or types)

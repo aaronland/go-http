@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aaronland/go-http/v3/fileserver"
-	"github.com/aaronland/go-http/v3/server"
+	"github.com/aaronland/go-http/v4/fileserver"
+	"github.com/aaronland/go-http/v4/server"
 	"github.com/sfomuseum/go-flags/multi"
 )
 

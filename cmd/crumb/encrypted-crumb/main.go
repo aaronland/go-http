@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/aaronland/go-http/v3/crumb"
+	"github.com/aaronland/go-http/v4/crumb"
 )
 
 func main() {

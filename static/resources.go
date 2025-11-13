@@ -3,7 +3,7 @@ package static
 import (
 	"net/http"
 
-	"github.com/aaronland/go-http/v3/rewrite"
+	"github.com/aaronland/go-http/v4/rewrite"
 )
 
 // ResourcesOptions provides a list of JavaScript and CSS link to include with HTML output.
