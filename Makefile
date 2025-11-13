@@ -7,3 +7,7 @@ cli:
 	go build -mod $(GOMOD) -ldflags="$(LDFLAGS)" -o bin/encrypted-crumb cmd/crumb/encrypted-crumb/main.go
 	go build -mod $(GOMOD) -ldflags="$(LDFLAGS)" -o bin/fileserver cmd/fileserver/fileserver/main.go
 
+bump-version:
+	perl -i -p -e 's/github.com\/aaronland\/go-http\/$(OLD)/github.com\/aaronland\/go-http\/$(NEW)/g' go.mod
+	perl -i -p -e 's/github.com\/aaronland\/go-http\/$(OLD)/github.com\/aaronland\/go-http\/$(NEW)/g' README.md
+	find . -name '*.go' | xargs perl -i -p -e 's/github.com\/aaronland\/go-http\/$(OLD)/github.com\/aaronland\/go-http\/$(NEW)/g'

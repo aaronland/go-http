@@ -1,4 +1,4 @@
-package handlers
+package route
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/aaronland/go-http/v3/server"
+	"github.com/aaronland/go-http/v4/server"
 )
 
 func TestRouteHandler(t *testing.T) {

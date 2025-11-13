@@ -3,11 +3,12 @@ package cookie
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
+
 	"github.com/aaronland/go-secretbox"
 	"github.com/aaronland/go-string/random"
 	"github.com/awnumar/memguard"
-	"net/http"
-	"net/url"
 )
 
 func init() {

@@ -1,4 +1,4 @@
-module github.com/aaronland/go-http/v3
+module github.com/aaronland/go-http/v4
 
 go 1.25.0
 

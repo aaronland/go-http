@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/aaronland/go-http/v3/cookie"
 	"log"
+
+	"github.com/aaronland/go-http/v4/cookie"
 )
 
 func main() {

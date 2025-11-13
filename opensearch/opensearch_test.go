@@ -1,4 +1,4 @@
-package handlers
+package opensearch
 
 import (
 	_ "fmt"

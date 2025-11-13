@@ -4,7 +4,7 @@ Opinionated package of wrapper, helper and utility functions for working with HT
 
 ## Documentation
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/aaronland/go-http.svg)](https://pkg.go.dev/github.com/aaronland/go-http/v3)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aaronland/go-http.svg)](https://pkg.go.dev/github.com/aaronland/go-http/v4)
 
 Documentation remains incomplete despite this being a "v3" release. Documentation, such as it is, can be found in the individual sub-packages.
 

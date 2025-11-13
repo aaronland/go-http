@@ -3,11 +3,12 @@ package cookie
 import (
 	"context"
 	"fmt"
-	"github.com/aaronland/go-roster"
-	"github.com/awnumar/memguard"
 	"net/http"
 	"net/url"
 	"sort"
+
+	"github.com/aaronland/go-roster"
+	"github.com/awnumar/memguard"
 )
 
 // Cookie is an interface for working with HTTP cookies.

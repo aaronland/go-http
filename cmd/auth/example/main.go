@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/aaronland/go-http/v3/auth"
-	"github.com/aaronland/go-http/v3/server"
+	"github.com/aaronland/go-http/v4/auth"
+	"github.com/aaronland/go-http/v4/server"
 )
 
 func main() {
