@@ -31,7 +31,7 @@ func TestOpenSearch(t *testing.T) {
 	}
 
 	desc := &OpenSearchDescription{
-		NSMoz:        NS_MOZ,
+		NSMoz:        NS_MOZILLA_SEARCH,
 		NSOpenSearch: NS_OPENSEARCH,
 		ShortName:    "Example Search",
 		Description:  "Example Search is an example",
