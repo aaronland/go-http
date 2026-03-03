@@ -1,6 +1,9 @@
 GOMOD=$(shell test -f "go.work" && echo "readonly" || echo "vendor")
 LDFLAGS=-s -w
 
+vuln:
+	govulncheck -show verbose ./...
+
 cli:
 	go build -mod $(GOMOD) -ldflags="$(LDFLAGS)" -o bin/jwt-secret cmd/auth/jwt-secret/main.go
 	go build -mod $(GOMOD) -ldflags="$(LDFLAGS)" -o bin/encrypted-cookie cmd/cookie/encrypted-cookie/main.go

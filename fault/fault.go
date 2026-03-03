@@ -34,10 +34,10 @@ type FaultHandlerVars struct {
 }
 
 // FaultHandlerVarsFunc is a custom function that returns a pointer to a struct that conforms to the required fields of the `FaultHandlerVars` struct type.
-type FaultHandlerVarsFunc func() interface{}
+type FaultHandlerVarsFunc func() any
 
 // ImplementsFaultHandlerVars returns a boolean value indicating whether 'vars' conforms to the required fields of the `FaultHandlerVars` struct type.
-func ImplementsFaultHandlerVars(vars interface{}) bool {
+func ImplementsFaultHandlerVars(vars any) bool {
 
 	switch vars.(type) {
 	case FaultHandlerVars, *FaultHandlerVars:
@@ -46,7 +46,7 @@ func ImplementsFaultHandlerVars(vars interface{}) bool {
 		// carry on
 	}
 
-	if reflect.TypeOf(vars).Kind() != reflect.Ptr {
+	if reflect.TypeOf(vars).Kind() != reflect.Pointer {
 		return false
 	}
 
@@ -71,7 +71,7 @@ func ImplementsFaultHandlerVars(vars interface{}) bool {
 	return true
 }
 
-func defaultFaultHandlerVars() interface{} {
+func defaultFaultHandlerVars() any {
 	return &FaultHandlerVars{
 		Status: 0,
 		Error:  fmt.Errorf("Undefined error"),
@@ -187,7 +187,7 @@ func FaultHandlerWithOptions(opts *FaultHandlerOptions) http.Handler {
 
 			default:
 
-				if reflect.TypeOf(vars).Kind() != reflect.Ptr {
+				if reflect.TypeOf(vars).Kind() != reflect.Pointer {
 					opts.Logger.Printf("[FAULT] template vars must be a pointer")
 					http.Error(rsp, "Invalid template vars", http.StatusInternalServerError)
 					return

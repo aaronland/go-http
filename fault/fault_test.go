@@ -44,7 +44,7 @@ func TestFaultHandlerVarsFunc(t *testing.T) {
 		Custom string
 	}
 
-	valid_func := func() interface{} {
+	valid_func := func() any {
 
 		vars := &ValidCustomVars{
 			Custom: "custom",
@@ -53,7 +53,7 @@ func TestFaultHandlerVarsFunc(t *testing.T) {
 		return vars
 	}
 
-	invalid_func := func() interface{} {
+	invalid_func := func() any {
 
 		vars := &InvalidCustomVars{
 			Custom: "custom",
@@ -89,7 +89,7 @@ func TestFaultHandlerWithCustomVars(t *testing.T) {
 		FaultHandlerVars
 	}
 
-	custom_func := func() interface{} {
+	custom_func := func() any {
 
 		vars := &CustomVars{
 			Custom: "This is custom text",

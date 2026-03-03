@@ -245,7 +245,7 @@ func deriveHandler(req *http.Request, handlers map[string]RouteHandlerFunc, matc
 		count_k := len(key_m)
 		path_values = make([]*pathValue, count_k)
 
-		for i := 0; i < count_k; i++ {
+		for i := range count_k {
 
 			key := key_m[i][1]
 			value := path_m[i+1]
