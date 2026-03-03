@@ -59,9 +59,8 @@ type cssMinifier struct {
 
 // Minifier is a CSS minifier.
 type Minifier struct {
-	KeepCSS2     bool // DEPRECATED, use Version = 2
-	Precision    int  // number of significant digits
-	newPrecision int  // precision for new numbers
+	Precision    int // number of significant digits
+	newPrecision int // precision for new numbers
 	Inline       bool
 	Version      int
 }
@@ -148,11 +147,7 @@ func (o *Minifier) Minify(m *minify.M, w io.Writer, r io.Reader, params map[stri
 		o.Inline = params != nil && params["inline"] == "1"
 	}
 	if o.Version <= 0 {
-		if o.KeepCSS2 {
-			o.Version = 2
-		} else {
-			o.Version = 3
-		}
+		o.Version = 3
 	}
 
 	z := parse.NewInput(r)
@@ -246,11 +241,8 @@ func (c *cssMinifier) minifyGrammar() {
 				c.w.Write(val.Data)
 			}
 			c.w.Write(leftBracketBytes)
-		case css.QualifiedRuleGrammar:
-			c.minifySelectors(data, c.p.Values())
-			c.w.Write(commaBytes)
 		case css.BeginRulesetGrammar:
-			c.minifySelectors(data, c.p.Values())
+			c.minifySelectors(c.p.Values())
 			c.w.Write(leftBracketBytes)
 		case css.DeclarationGrammar:
 			c.minifyDeclaration(data, c.p.Values())
@@ -277,7 +269,7 @@ func (c *cssMinifier) minifyGrammar() {
 	}
 }
 
-func (c *cssMinifier) minifySelectors(property []byte, values []css.Token) {
+func (c *cssMinifier) minifySelectors(values []css.Token) {
 	inAttr := false
 	isClass := false
 	for _, val := range c.p.Values() {
@@ -1140,7 +1132,7 @@ func (c *cssMinifier) minifyProperty(prop Hash, values []Token) []Token {
 		values[0] = minifyColor(values[0])
 	case Background_Color:
 		values[0] = minifyColor(values[0])
-		if c.o.Version == 0 {
+		if c.o.Version >= 3 {
 			if values[0].Ident == Transparent {
 				values[0].Data = initialBytes
 				values[0].Ident = Initial
