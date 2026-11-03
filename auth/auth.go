@@ -31,6 +31,15 @@ var authenticator_roster roster.Roster
 // an instance of that authenticator
 type AuthenticatorInitializationFunc func(ctx context.Context, uri string) (Authenticator, error)
 
+func MustRegisterAuthenticator(ctx context.Context, scheme string, init_func AuthenticatorInitializationFunc) {
+
+	err := RegisterAuthenticator(ctx, scheme, init_func)
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to register %s scheme, %v", scheme, err))
+	}
+}
+
 // RegisterAuthenticator registers 'scheme' as a key pointing to 'init_func' in an internal lookup table
 // used to create new `Authenticator` instances by the `NewAuthenticator` method.
 func RegisterAuthenticator(ctx context.Context, scheme string, init_func AuthenticatorInitializationFunc) error {
