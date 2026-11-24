@@ -5,10 +5,10 @@ package iam
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Lists all managed policies that are attached to the specified IAM role.
@@ -85,6 +85,27 @@ type ListAttachedRolePoliciesInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListAttachedRolePoliciesInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListAttachedRolePoliciesRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListAttachedRolePoliciesInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Marker != nil {
+		s.WriteString(schemas.ListAttachedRolePoliciesRequest_Marker, *v.Marker)
+	}
+	if v.MaxItems != nil {
+		s.WriteInt32(schemas.ListAttachedRolePoliciesRequest_MaxItems, *v.MaxItems)
+	}
+	if v.PathPrefix != nil {
+		s.WriteString(schemas.ListAttachedRolePoliciesRequest_PathPrefix, *v.PathPrefix)
+	}
+	if v.RoleName != nil {
+		s.WriteString(schemas.ListAttachedRolePoliciesRequest_RoleName, *v.RoleName)
+	}
+}
+
 // Contains the response to a successful [ListAttachedRolePolicies] request.
 //
 // [ListAttachedRolePolicies]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListAttachedRolePolicies.html
@@ -111,77 +132,58 @@ type ListAttachedRolePoliciesOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListAttachedRolePoliciesOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListAttachedRolePoliciesResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListAttachedRolePoliciesOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.AttachedPolicies != nil {
+		serializeattachedPoliciesListType(s, schemas.ListAttachedRolePoliciesResponse_AttachedPolicies, v.AttachedPolicies)
+	}
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListAttachedRolePoliciesResponse_IsTruncated, v.IsTruncated)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListAttachedRolePoliciesResponse_Marker, *v.Marker)
+	}
+}
+func (v *ListAttachedRolePoliciesOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListAttachedRolePoliciesResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListAttachedRolePoliciesResponse_AttachedPolicies:
+			return deserializeattachedPoliciesListType(d, schemas.ListAttachedRolePoliciesResponse_AttachedPolicies, &v.AttachedPolicies)
+		case schemas.ListAttachedRolePoliciesResponse_IsTruncated:
+			return d.ReadBool(schemas.ListAttachedRolePoliciesResponse_IsTruncated, &v.IsTruncated)
+		case schemas.ListAttachedRolePoliciesResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListAttachedRolePoliciesResponse_Marker, v.Marker)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListAttachedRolePoliciesMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListAttachedRolePolicies, schemas.ListAttachedRolePoliciesRequest, schemas.ListAttachedRolePoliciesResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListAttachedRolePolicies{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListAttachedRolePolicies, schemas.ListAttachedRolePoliciesRequest, schemas.ListAttachedRolePoliciesResponse), output: &ListAttachedRolePoliciesOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListAttachedRolePolicies{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListAttachedRolePolicies"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpListAttachedRolePoliciesValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListAttachedRolePolicies(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -194,12 +196,6 @@ func (c *Client) addOperationListAttachedRolePoliciesMiddlewares(stack *middlewa
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -310,11 +306,3 @@ type ListAttachedRolePoliciesAPIClient interface {
 }
 
 var _ ListAttachedRolePoliciesAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opListAttachedRolePolicies(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListAttachedRolePolicies",
-	}
-}

@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Creates an IAM delegation request for temporary access delegation.
@@ -112,6 +111,44 @@ type CreateDelegationRequestInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *CreateDelegationRequestInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.CreateDelegationRequestRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *CreateDelegationRequestInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Description != nil {
+		s.WriteString(schemas.CreateDelegationRequestRequest_Description, *v.Description)
+	}
+	if v.NotificationChannel != nil {
+		s.WriteString(schemas.CreateDelegationRequestRequest_NotificationChannel, *v.NotificationChannel)
+	}
+	if v.OnlySendByOwner != false {
+		s.WriteBool(schemas.CreateDelegationRequestRequest_OnlySendByOwner, v.OnlySendByOwner)
+	}
+	if v.OwnerAccountId != nil {
+		s.WriteString(schemas.CreateDelegationRequestRequest_OwnerAccountId, *v.OwnerAccountId)
+	}
+	if v.Permissions != nil {
+		s.WriteStruct(schemas.CreateDelegationRequestRequest_Permissions)
+		v.Permissions.SerializeMembers(s)
+		s.CloseStruct()
+	}
+	if v.RedirectUrl != nil {
+		s.WriteString(schemas.CreateDelegationRequestRequest_RedirectUrl, *v.RedirectUrl)
+	}
+	if v.RequestMessage != nil {
+		s.WriteString(schemas.CreateDelegationRequestRequest_RequestMessage, *v.RequestMessage)
+	}
+	if v.RequestorWorkflowId != nil {
+		s.WriteString(schemas.CreateDelegationRequestRequest_RequestorWorkflowId, *v.RequestorWorkflowId)
+	}
+	if v.SessionDuration != nil {
+		s.WriteInt32(schemas.CreateDelegationRequestRequest_SessionDuration, *v.SessionDuration)
+	}
+}
+
 type CreateDelegationRequestOutput struct {
 
 	// A deep link URL to the Amazon Web Services Management Console for managing the
@@ -132,77 +169,54 @@ type CreateDelegationRequestOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *CreateDelegationRequestOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.CreateDelegationRequestResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *CreateDelegationRequestOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.ConsoleDeepLink != nil {
+		s.WriteString(schemas.CreateDelegationRequestResponse_ConsoleDeepLink, *v.ConsoleDeepLink)
+	}
+	if v.DelegationRequestId != nil {
+		s.WriteString(schemas.CreateDelegationRequestResponse_DelegationRequestId, *v.DelegationRequestId)
+	}
+}
+func (v *CreateDelegationRequestOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.CreateDelegationRequestResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.CreateDelegationRequestResponse_ConsoleDeepLink:
+			v.ConsoleDeepLink = new(string)
+			return d.ReadString(schemas.CreateDelegationRequestResponse_ConsoleDeepLink, v.ConsoleDeepLink)
+		case schemas.CreateDelegationRequestResponse_DelegationRequestId:
+			v.DelegationRequestId = new(string)
+			return d.ReadString(schemas.CreateDelegationRequestResponse_DelegationRequestId, v.DelegationRequestId)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationCreateDelegationRequestMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.CreateDelegationRequest, schemas.CreateDelegationRequestRequest, schemas.CreateDelegationRequestResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpCreateDelegationRequest{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.CreateDelegationRequest, schemas.CreateDelegationRequestRequest, schemas.CreateDelegationRequestResponse), output: &CreateDelegationRequestOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpCreateDelegationRequest{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "CreateDelegationRequest"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCreateDelegationRequestValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opCreateDelegationRequest(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -217,22 +231,8 @@ func (c *Client) addOperationCreateDelegationRequestMiddlewares(stack *middlewar
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opCreateDelegationRequest(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "CreateDelegationRequest",
-	}
 }

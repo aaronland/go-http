@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Returns information about the service-specific credentials associated with the
@@ -16,9 +15,20 @@ import (
 // service-specific credentials returned by this operation are used only for
 // authenticating the IAM user to a specific service. For more information about
 // using service-specific credentials to authenticate to an Amazon Web Services
-// service, see [Set up service-specific credentials]in the CodeCommit User Guide.
+// service, refer to the following docs:
 //
-// [Set up service-specific credentials]: https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-gc.html
+//   - For service-specific credentials with CodeCommit, refer to [IAM credentials for CodeCommit: Git credentials, SSH keys, and Amazon Web Services access keys]in the IAM User
+//     Guide.
+//
+//   - For service-specific credentials with Amazon Keyspaces (for Apache
+//     Cassandra), refer to [Use IAM with Amazon Keyspaces (for Apache Cassandra)]in the IAM User Guide.
+//
+//   - For services that support long-term API keys, refer to [API keys for Amazon Web Services services]in the IAM User
+//     Guide.
+//
+// [IAM credentials for CodeCommit: Git credentials, SSH keys, and Amazon Web Services access keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_ssh-keys.html
+// [Use IAM with Amazon Keyspaces (for Apache Cassandra)]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_keyspaces.html
+// [API keys for Amazon Web Services services]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_api_keys_for_aws_services.html
 func (c *Client) ListServiceSpecificCredentials(ctx context.Context, params *ListServiceSpecificCredentialsInput, optFns ...func(*Options)) (*ListServiceSpecificCredentialsOutput, error) {
 	if params == nil {
 		params = &ListServiceSpecificCredentialsInput{}
@@ -71,6 +81,30 @@ type ListServiceSpecificCredentialsInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListServiceSpecificCredentialsInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListServiceSpecificCredentialsRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListServiceSpecificCredentialsInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.AllUsers != nil {
+		s.WriteBool(schemas.ListServiceSpecificCredentialsRequest_AllUsers, *v.AllUsers)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListServiceSpecificCredentialsRequest_Marker, *v.Marker)
+	}
+	if v.MaxItems != nil {
+		s.WriteInt32(schemas.ListServiceSpecificCredentialsRequest_MaxItems, *v.MaxItems)
+	}
+	if v.ServiceName != nil {
+		s.WriteString(schemas.ListServiceSpecificCredentialsRequest_ServiceName, *v.ServiceName)
+	}
+	if v.UserName != nil {
+		s.WriteString(schemas.ListServiceSpecificCredentialsRequest_UserName, *v.UserName)
+	}
+}
+
 type ListServiceSpecificCredentialsOutput struct {
 
 	// A flag that indicates whether there are more items to return. If your results
@@ -92,74 +126,55 @@ type ListServiceSpecificCredentialsOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListServiceSpecificCredentialsOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListServiceSpecificCredentialsResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListServiceSpecificCredentialsOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListServiceSpecificCredentialsResponse_IsTruncated, v.IsTruncated)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListServiceSpecificCredentialsResponse_Marker, *v.Marker)
+	}
+	if v.ServiceSpecificCredentials != nil {
+		serializeServiceSpecificCredentialsListType(s, schemas.ListServiceSpecificCredentialsResponse_ServiceSpecificCredentials, v.ServiceSpecificCredentials)
+	}
+}
+func (v *ListServiceSpecificCredentialsOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListServiceSpecificCredentialsResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListServiceSpecificCredentialsResponse_IsTruncated:
+			return d.ReadBool(schemas.ListServiceSpecificCredentialsResponse_IsTruncated, &v.IsTruncated)
+		case schemas.ListServiceSpecificCredentialsResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListServiceSpecificCredentialsResponse_Marker, v.Marker)
+		case schemas.ListServiceSpecificCredentialsResponse_ServiceSpecificCredentials:
+			return deserializeServiceSpecificCredentialsListType(d, schemas.ListServiceSpecificCredentialsResponse_ServiceSpecificCredentials, &v.ServiceSpecificCredentials)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListServiceSpecificCredentialsMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListServiceSpecificCredentials, schemas.ListServiceSpecificCredentialsRequest, schemas.ListServiceSpecificCredentialsResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListServiceSpecificCredentials{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListServiceSpecificCredentials, schemas.ListServiceSpecificCredentialsRequest, schemas.ListServiceSpecificCredentialsResponse), output: &ListServiceSpecificCredentialsOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListServiceSpecificCredentials{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListServiceSpecificCredentials"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListServiceSpecificCredentials(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -174,22 +189,8 @@ func (c *Client) addOperationListServiceSpecificCredentialsMiddlewares(stack *mi
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opListServiceSpecificCredentials(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListServiceSpecificCredentials",
-	}
 }

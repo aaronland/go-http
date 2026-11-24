@@ -5,10 +5,10 @@ package iam
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Returns information about the signing certificates associated with the
@@ -69,6 +69,24 @@ type ListSigningCertificatesInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListSigningCertificatesInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListSigningCertificatesRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListSigningCertificatesInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Marker != nil {
+		s.WriteString(schemas.ListSigningCertificatesRequest_Marker, *v.Marker)
+	}
+	if v.MaxItems != nil {
+		s.WriteInt32(schemas.ListSigningCertificatesRequest_MaxItems, *v.MaxItems)
+	}
+	if v.UserName != nil {
+		s.WriteString(schemas.ListSigningCertificatesRequest_UserName, *v.UserName)
+	}
+}
+
 // Contains the response to a successful [ListSigningCertificates] request.
 //
 // [ListSigningCertificates]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListSigningCertificates.html
@@ -97,74 +115,55 @@ type ListSigningCertificatesOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListSigningCertificatesOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListSigningCertificatesResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListSigningCertificatesOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Certificates != nil {
+		serializecertificateListType(s, schemas.ListSigningCertificatesResponse_Certificates, v.Certificates)
+	}
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListSigningCertificatesResponse_IsTruncated, v.IsTruncated)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListSigningCertificatesResponse_Marker, *v.Marker)
+	}
+}
+func (v *ListSigningCertificatesOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListSigningCertificatesResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListSigningCertificatesResponse_Certificates:
+			return deserializecertificateListType(d, schemas.ListSigningCertificatesResponse_Certificates, &v.Certificates)
+		case schemas.ListSigningCertificatesResponse_IsTruncated:
+			return d.ReadBool(schemas.ListSigningCertificatesResponse_IsTruncated, &v.IsTruncated)
+		case schemas.ListSigningCertificatesResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListSigningCertificatesResponse_Marker, v.Marker)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListSigningCertificatesMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListSigningCertificates, schemas.ListSigningCertificatesRequest, schemas.ListSigningCertificatesResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListSigningCertificates{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListSigningCertificates, schemas.ListSigningCertificatesRequest, schemas.ListSigningCertificatesResponse), output: &ListSigningCertificatesOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListSigningCertificates{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListSigningCertificates"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListSigningCertificates(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -177,12 +176,6 @@ func (c *Client) addOperationListSigningCertificatesMiddlewares(stack *middlewar
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -293,11 +286,3 @@ type ListSigningCertificatesAPIClient interface {
 }
 
 var _ ListSigningCertificatesAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opListSigningCertificates(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListSigningCertificates",
-	}
-}
