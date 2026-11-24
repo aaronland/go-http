@@ -2,17 +2,13 @@
 
 Go package providing opinionated HTTP middleware for web-based map tiles.
 
-## Version 2
-
-`/v2` of this package is not just a complete refactoring of the code but also a complete rethink about what its function is and how it works. There is basically nothing which is backwards compatible with previous versions.
-
 ## Motivation
 
 The original motivation for the `go-http-maps` package was to define a handful of top-level methods and `net/http` middleware handlers to manage the drudegry of setting up maps, with a variety of map providers (Leaflet, Protomaps, Nextzen/Tangramjs), It "worked" but, in the end, it was also not "easy".
 
 Version 2 removes most of the functionality of the `go-http-maps` package and instead focuses on a handful of methods for providing a dynamic map "config" file (exposed as an HTTP endpoint) which can be retrieved and processed from the browser.
 
-This package no longer provides static asset handlers for Leaflet or Protomaps. It is left up to you to bundle (and serve) them from your own code. You could, if you wanted, define a custom `http.Handler` instance to load those files from the `github.com/aaronland/go-http-maps/v2/static/www.FS` embedded filesystem but that's still something you'll need to do on your own.
+This package no longer provides static asset handlers for Leaflet or Protomaps. It is left up to you to bundle (and serve) them from your own code. You could, if you wanted, define a custom `http.Handler` instance to load those files from the `github.com/aaronland/go-http/v4/maps//static/www.FS` embedded filesystem but that's still something you'll need to do on your own.
 
 ## Documentation
 
@@ -32,8 +28,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/aaronland/go-http-maps/v2"
-	"github.com/aaronland/go-http-maps/v2/static/www"
+	"github.com/aaronland/go-http/v4/maps
+	"github.com/aaronland/go-http/v4/maps/static/www"
 	"github.com/sfomuseum/go-flags/multi"	
 )
 
