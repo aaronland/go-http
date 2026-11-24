@@ -5,9 +5,9 @@ package iam
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Lists the names of the inline policies that are embedded in the specified IAM
@@ -71,6 +71,24 @@ type ListRolePoliciesInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListRolePoliciesInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListRolePoliciesRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListRolePoliciesInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Marker != nil {
+		s.WriteString(schemas.ListRolePoliciesRequest_Marker, *v.Marker)
+	}
+	if v.MaxItems != nil {
+		s.WriteInt32(schemas.ListRolePoliciesRequest_MaxItems, *v.MaxItems)
+	}
+	if v.RoleName != nil {
+		s.WriteString(schemas.ListRolePoliciesRequest_RoleName, *v.RoleName)
+	}
+}
+
 // Contains the response to a successful [ListRolePolicies] request.
 //
 // [ListRolePolicies]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListRolePolicies.html
@@ -99,77 +117,58 @@ type ListRolePoliciesOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListRolePoliciesOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListRolePoliciesResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListRolePoliciesOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListRolePoliciesResponse_IsTruncated, v.IsTruncated)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListRolePoliciesResponse_Marker, *v.Marker)
+	}
+	if v.PolicyNames != nil {
+		serializepolicyNameListType(s, schemas.ListRolePoliciesResponse_PolicyNames, v.PolicyNames)
+	}
+}
+func (v *ListRolePoliciesOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListRolePoliciesResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListRolePoliciesResponse_IsTruncated:
+			return d.ReadBool(schemas.ListRolePoliciesResponse_IsTruncated, &v.IsTruncated)
+		case schemas.ListRolePoliciesResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListRolePoliciesResponse_Marker, v.Marker)
+		case schemas.ListRolePoliciesResponse_PolicyNames:
+			return deserializepolicyNameListType(d, schemas.ListRolePoliciesResponse_PolicyNames, &v.PolicyNames)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListRolePoliciesMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListRolePolicies, schemas.ListRolePoliciesRequest, schemas.ListRolePoliciesResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListRolePolicies{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListRolePolicies, schemas.ListRolePoliciesRequest, schemas.ListRolePoliciesResponse), output: &ListRolePoliciesOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListRolePolicies{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListRolePolicies"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpListRolePoliciesValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListRolePolicies(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -182,12 +181,6 @@ func (c *Client) addOperationListRolePoliciesMiddlewares(stack *middleware.Stack
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -296,11 +289,3 @@ type ListRolePoliciesAPIClient interface {
 }
 
 var _ ListRolePoliciesAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opListRolePolicies(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListRolePolicies",
-	}
-}

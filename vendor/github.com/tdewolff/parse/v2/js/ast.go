@@ -11,6 +11,7 @@ import (
 )
 
 var ErrInvalidJSON = fmt.Errorf("invalid JSON")
+var VariableIndexingThreshold = 16 // threshold for number of declared/undeclared variables in scope, above which the variable index map is filled
 
 type JSONer interface {
 	JSON(io.Writer) error
@@ -22,14 +23,14 @@ type AST struct {
 }
 
 func (ast AST) String() string {
-	s := ""
+	var s strings.Builder
 	for i, item := range ast.BlockStmt.List {
 		if i != 0 {
-			s += " "
+			s.WriteString(" ")
 		}
-		s += item.String()
+		s.WriteString(item.String())
 	}
-	return s
+	return s.String()
 }
 
 // JS writes JavaScript to writer.
@@ -180,19 +181,20 @@ func (vs VarsByUses) Less(i, j int) bool {
 type VarArray []*Var
 
 func (vs VarArray) String() string {
-	s := "["
+	var s strings.Builder
+	s.WriteString("[")
 	for i, v := range vs {
 		if i != 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
 		links := 0
 		for v.Link != nil {
 			v = v.Link
 			links++
 		}
-		s += fmt.Sprintf("Var{%v %s %v %v}", v.Decl, string(v.Data), links, v.Uses)
+		s.WriteString(fmt.Sprintf("Var{%v %s %v %v}", v.Decl, string(v.Data), links, v.Uses))
 	}
-	return s + "]"
+	return s.String() + "]"
 }
 
 // Scope is a function or block scope with a list of variables declared and used.
@@ -200,10 +202,11 @@ type Scope struct {
 	Parent, Func   *Scope   // Parent is nil for global scope
 	Declared       VarArray // Link in Var are always nil
 	Undeclared     VarArray
+	VarIndices     map[string][]int // indices into Declared (index) and Undeclared (-index-1), only used with more than VariableIndexingThreshold
 	VarDecls       []*VarDecl
-	NumForDecls    uint16 // offset into Declared to mark variables used in for statements
-	NumFuncArgs    uint16 // offset into Declared to mark variables used in function arguments
-	NumArgUses     uint16 // offset into Undeclared to mark variables used in arguments
+	NumForDecls    int // offset into Declared to mark variables used in for statements
+	NumFuncArgs    int // offset into Declared to mark variables used in function arguments
+	NumArgUses     int // offset into Undeclared to mark variables used in arguments
 	IsGlobalOrFunc bool
 	HasWith        bool
 }
@@ -248,13 +251,26 @@ func (s *Scope) Declare(decl DeclType, name []byte) (*Var, bool) {
 	var v *Var
 	// reuse variable if previously used, as in:  a;var a
 	if decl != ArgumentDecl { // in case of function f(a=b,b), where the first b is different from the second
-		for i, uv := range s.Undeclared[s.NumArgUses:] {
-			// no need to evaluate v.Link as v.Data stays the same and Link is nil in the active scope
-			if 0 < uv.Uses && uv.Decl == NoDecl && bytes.Equal(name, uv.Data) {
+		if s.VarIndices != nil {
+			for _, index := range s.VarIndices[string(name)] {
+				if index < -s.NumArgUses {
+					// no need to evaluate v.Link as v.Data stays the same and Link is nil in the active scope
+					// must be NoDecl so that it can't be a var declaration that has been added
+					if uv := s.Undeclared[-index-1]; 0 < uv.Uses && uv.Decl == NoDecl {
+						v = uv
+						break
+					}
+				}
+			}
+		} else {
+			for i, uv := range s.Undeclared[s.NumArgUses:] {
+				// no need to evaluate v.Link as v.Data stays the same and Link is nil in the active scope
 				// must be NoDecl so that it can't be a var declaration that has been added
-				v = uv
-				s.Undeclared = append(s.Undeclared[:int(s.NumArgUses)+i], s.Undeclared[int(s.NumArgUses)+i+1:]...)
-				break
+				if 0 < uv.Uses && uv.Decl == NoDecl && bytes.Equal(name, uv.Data) {
+					v = uv
+					s.Undeclared = append(s.Undeclared[:s.NumArgUses+i], s.Undeclared[s.NumArgUses+i+1:]...)
+					break
+				}
 			}
 		}
 	}
@@ -265,7 +281,7 @@ func (s *Scope) Declare(decl DeclType, name []byte) (*Var, bool) {
 		v.Decl = decl
 	}
 	v.Uses++
-	s.Declared = append(s.Declared, v)
+	s.addDeclared(v)
 	for s != curScope {
 		curScope.AddUndeclared(v) // add variable declaration as used variable to the current scope
 		curScope = curScope.Parent
@@ -283,7 +299,7 @@ func (s *Scope) Use(name []byte) *Var {
 		if v == nil {
 			// add variable to the context list and to the scope's undeclared
 			v = &Var{name, nil, 0, NoDecl}
-			s.Undeclared = append(s.Undeclared, v)
+			s.addUndeclared(v)
 		}
 	}
 	v.Uses++
@@ -295,8 +311,22 @@ func (s *Scope) findDeclared(name []byte, skipForDeclared bool) *Var {
 	start := 0
 	if skipForDeclared {
 		// we skip the for initializer for declarations (only has effect for let/const)
-		start = int(s.NumForDecls)
+		start = s.NumForDecls
 	}
+	if s.VarIndices != nil {
+		indices := s.VarIndices[string(name)]
+		// reverse order to find the inner let first in `for(let a in []){let a; {a}}`
+		for i := len(indices) - 1; 0 <= i; i-- {
+			if start <= indices[i] {
+				return s.Declared[indices[i]]
+			} else if 0 <= indices[i] {
+				// in for
+				break
+			}
+		}
+		return nil
+	}
+
 	// reverse order to find the inner let first in `for(let a in []){let a; {a}}`
 	for i := len(s.Declared) - 1; start <= i; i-- {
 		v := s.Declared[i]
@@ -310,6 +340,17 @@ func (s *Scope) findDeclared(name []byte, skipForDeclared bool) *Var {
 
 // findUndeclared finds an undeclared variable in the current and contained scopes.
 func (s *Scope) findUndeclared(name []byte) *Var {
+	if s.VarIndices != nil {
+		for _, index := range s.VarIndices[string(name)] {
+			if index < 0 {
+				if v := s.Undeclared[-index-1]; 0 < v.Uses {
+					return v
+				}
+			}
+		}
+		return nil
+	}
+
 	for _, v := range s.Undeclared {
 		// no need to evaluate v.Link as v.Data stays the same and Link is nil in the active scope
 		if 0 < v.Uses && bytes.Equal(name, v.Data) {
@@ -322,46 +363,150 @@ func (s *Scope) findUndeclared(name []byte) *Var {
 // add undeclared variable to scope, this is called for the block scope when declaring a var in it
 func (s *Scope) AddUndeclared(v *Var) {
 	// don't add undeclared symbol if it's already there
-	for _, vorig := range s.Undeclared {
-		if v == vorig {
-			return
+	if s.VarIndices != nil {
+		for _, index := range s.VarIndices[string(v.Data)] {
+			if index < 0 {
+				if vorig := s.Undeclared[-index-1]; v == vorig {
+					return
+				}
+			}
+		}
+	} else {
+		for _, vorig := range s.Undeclared {
+			if v == vorig {
+				return
+			}
 		}
 	}
-	s.Undeclared = append(s.Undeclared, v) // add variable declaration as used variable to the current scope
+	s.addUndeclared(v) // add variable declaration as used variable to the current scope
+}
+
+func (s *Scope) buildVarIndices() {
+	s.VarIndices = make(map[string][]int, len(s.Declared)+len(s.Undeclared))
+	for index, v := range s.Declared {
+		s.VarIndices[string(v.Data)] = append(s.VarIndices[string(v.Data)], index)
+	}
+	for index, v := range s.Undeclared {
+		s.VarIndices[string(v.Data)] = append(s.VarIndices[string(v.Data)], -index-1)
+	}
+}
+
+func (s *Scope) addDeclared(vs ...*Var) {
+	s.Declared = append(s.Declared, vs...)
+	if s.VarIndices != nil {
+		offset := len(s.Declared) - len(vs)
+		for i, v := range vs {
+			s.VarIndices[string(v.Data)] = append(s.VarIndices[string(v.Data)], offset+i)
+		}
+	} else if VariableIndexingThreshold <= len(s.Declared)+len(s.Undeclared) {
+		s.buildVarIndices()
+	}
+}
+
+func (s *Scope) addUndeclared(vs ...*Var) {
+	s.Undeclared = append(s.Undeclared, vs...)
+	if s.VarIndices != nil {
+		offset := len(s.Undeclared) - len(vs) + 1
+		for i, v := range vs {
+			s.VarIndices[string(v.Data)] = append(s.VarIndices[string(v.Data)], -offset-i)
+		}
+	} else if VariableIndexingThreshold <= len(s.Declared)+len(s.Undeclared) {
+		s.buildVarIndices()
+	}
 }
 
 // MarkForStmt marks the declared variables in current scope as for statement initializer to distinguish from declarations in body.
 func (s *Scope) MarkForStmt() {
-	s.NumForDecls = uint16(len(s.Declared))
-	s.NumArgUses = uint16(len(s.Undeclared)) // ensures for different b's in for(var a in b){let b}
+	s.NumForDecls = len(s.Declared)
+	s.NumArgUses = len(s.Undeclared) // ensures for different b's in for(var a in b){let b}
 }
 
 // MarkFuncArgs marks the declared/undeclared variables in the current scope as function arguments.
 func (s *Scope) MarkFuncArgs() {
-	s.NumFuncArgs = uint16(len(s.Declared))
-	s.NumArgUses = uint16(len(s.Undeclared)) // ensures different b's in `function f(a=b){var b}`.
+	s.NumFuncArgs = len(s.Declared)
+	s.NumArgUses = len(s.Undeclared) // ensures different b's in `function f(a=b){var b}`.
 }
 
 // HoistUndeclared copies all undeclared variables of the current scope to the parent scope.
 func (s *Scope) HoistUndeclared() {
-	for i, vorig := range s.Undeclared {
+	// Remove reused declarations once the scope closes, keeping references to outer declarations.
+	if s.VarIndices != nil {
+		n := 0
+		numArgUses := s.NumArgUses
+	UndeclaredLoop:
+		for i, v := range s.Undeclared {
+			if v.Decl != NoDecl {
+				for _, index := range s.VarIndices[string(v.Data)] {
+					if 0 <= index && s.Declared[index] == v {
+						if i < numArgUses {
+							s.NumArgUses--
+						}
+						continue UndeclaredLoop
+					}
+				}
+			}
+			s.Undeclared[n] = v
+			n++
+		}
+		if n != len(s.Undeclared) {
+			s.Undeclared = s.Undeclared[:n]
+			s.buildVarIndices()
+		}
+	}
+	if s.Parent == nil {
+		return
+	}
+
+	hoist := make([]*Var, 0, len(s.Undeclared))
+Loop:
+	for j, vorig := range s.Undeclared {
 		// no need to evaluate vorig.Link as vorig.Data stays the same
 		if 0 < vorig.Uses && vorig.Decl == NoDecl {
-			if v := s.Parent.findDeclared(vorig.Data, false); v != nil {
-				// check if variable is declared in parent scope
-				v.Uses += vorig.Uses
-				vorig.Link = v
-				s.Undeclared[i] = v // point reference to existing var (to avoid many Link chains)
-			} else if v := s.Parent.findUndeclared(vorig.Data); v != nil {
-				// check if variable is already used before in parent scope
-				v.Uses += vorig.Uses
-				vorig.Link = v
-				s.Undeclared[i] = v // point reference to existing var (to avoid many Link chains)
-			} else {
+			if s.Parent.VarIndices != nil {
+				indices := s.Parent.VarIndices[string(vorig.Data)]
+				for i := len(indices) - 1; 0 <= i; i-- { // findDeclared
+					if 0 <= indices[i] {
+						v := s.Parent.Declared[indices[i]]
+						// check if variable is declared in parent scope
+						v.Uses += vorig.Uses
+						vorig.Link = v
+						s.Undeclared[j] = v // point reference to existing var (to avoid many Link chains)
+						continue Loop
+					}
+				}
+				for _, index := range indices { // findUndeclared
+					if index < 0 {
+						if v := s.Parent.Undeclared[-index-1]; 0 < v.Uses {
+							// check if variable is already used before in parent scope
+							v.Uses += vorig.Uses
+							vorig.Link = v
+							s.Undeclared[j] = v // point reference to existing var (to avoid many Link chains)
+							continue Loop
+						}
+					}
+				}
 				// add variable to the context list and to the scope's undeclared
-				s.Parent.Undeclared = append(s.Parent.Undeclared, vorig)
+				hoist = append(hoist, vorig)
+			} else {
+				if v := s.Parent.findDeclared(vorig.Data, false); v != nil {
+					// check if variable is declared in parent scope
+					v.Uses += vorig.Uses
+					vorig.Link = v
+					s.Undeclared[j] = v // point reference to existing var (to avoid many Link chains)
+				} else if v := s.Parent.findUndeclared(vorig.Data); v != nil {
+					// check if variable is already used before in parent scope
+					v.Uses += vorig.Uses
+					vorig.Link = v
+					s.Undeclared[j] = v // point reference to existing var (to avoid many Link chains)
+				} else {
+					// add variable to the context list and to the scope's undeclared
+					hoist = append(hoist, vorig)
+				}
 			}
 		}
+	}
+	if 0 < len(hoist) {
+		s.Parent.addUndeclared(hoist...)
 	}
 }
 
@@ -369,36 +514,67 @@ func (s *Scope) HoistUndeclared() {
 // Called when possible arrow func ends up being a parenthesized expression, scope is not further used.
 func (s *Scope) UndeclareScope() {
 	// look if the variable already exists in the parent scope, if so replace the Var pointer in original use
+	hoist := make([]*Var, 0, len(s.Undeclared))
+Loop:
 	for _, vorig := range s.Declared {
 		// no need to evaluate vorig.Link as vorig.Data stays the same, and Link is always nil in Declared
 		// vorig.Uses will be atleast 1
-		if v := s.Parent.findDeclared(vorig.Data, false); v != nil {
-			// check if variable has been declared in this scope
-			v.Uses += vorig.Uses
-			vorig.Link = v
-		} else if v := s.Parent.findUndeclared(vorig.Data); v != nil {
-			// check if variable is already used before in the current or lower scopes
-			v.Uses += vorig.Uses
-			vorig.Link = v
-		} else {
+		if s.Parent.VarIndices != nil {
+			indices := s.Parent.VarIndices[string(vorig.Data)]
+			for i := len(indices) - 1; 0 <= i; i-- { // findDeclared
+				if 0 <= indices[i] {
+					v := s.Parent.Declared[indices[i]]
+					// check if variable has been declared in this scope
+					v.Uses += vorig.Uses
+					vorig.Link = v
+					continue Loop
+				}
+			}
+			for _, index := range indices { // findUndeclared
+				if index < 0 {
+					if v := s.Parent.Undeclared[-index-1]; 0 < v.Uses {
+						// check if variable is already used before in the current or lower scopes
+						v.Uses += vorig.Uses
+						vorig.Link = v
+						continue Loop
+					}
+				}
+			}
 			// add variable to the context list and to the scope's undeclared
 			vorig.Decl = NoDecl
-			s.Parent.Undeclared = append(s.Parent.Undeclared, vorig)
+			hoist = append(hoist, vorig)
+		} else {
+			if v := s.Parent.findDeclared(vorig.Data, false); v != nil {
+				// check if variable has been declared in this scope
+				v.Uses += vorig.Uses
+				vorig.Link = v
+			} else if v := s.Parent.findUndeclared(vorig.Data); v != nil {
+				// check if variable is already used before in the current or lower scopes
+				v.Uses += vorig.Uses
+				vorig.Link = v
+			} else {
+				// add variable to the context list and to the scope's undeclared
+				vorig.Decl = NoDecl
+				hoist = append(hoist, vorig)
+			}
 		}
+	}
+	if 0 < len(hoist) {
+		s.Parent.addUndeclared(hoist...)
 	}
 	s.Declared = s.Declared[:0]
 	s.Undeclared = s.Undeclared[:0]
+	s.VarIndices = nil
 }
 
 // Unscope moves all declared variables of the current scope to the parent scope. Undeclared variables are already in the parent scope.
 func (s *Scope) Unscope() {
-	for _, vorig := range s.Declared {
-		// no need to evaluate vorig.Link as vorig.Data stays the same, and Link is always nil in Declared
-		// vorig.Uses will be atleast 1
-		s.Parent.Declared = append(s.Parent.Declared, vorig)
-	}
+	// no need to evaluate vorig.Link as vorig.Data stays the same, and Link is always nil in Declared
+	// vorig.Uses will be atleast 1
+	s.Parent.addDeclared(s.Declared...)
 	s.Declared = s.Declared[:0]
 	s.Undeclared = s.Undeclared[:0]
+	s.VarIndices = nil
 }
 
 ////////////////////////////////////////////////////////////////
@@ -454,11 +630,12 @@ type BlockStmt struct {
 }
 
 func (n BlockStmt) String() string {
-	s := "Stmt({"
+	var s strings.Builder
+	s.WriteString("Stmt({")
 	for _, item := range n.List {
-		s += " " + item.String()
+		s.WriteString(" " + item.String())
 	}
-	return s + " })"
+	return s.String() + " })"
 }
 
 // JS writes JavaScript to writer.
@@ -724,14 +901,15 @@ type CaseClause struct {
 }
 
 func (n CaseClause) String() string {
-	s := " Clause(" + n.TokenType.String()
+	var s strings.Builder
+	s.WriteString(" Clause(" + n.TokenType.String())
 	if n.Cond != nil {
-		s += " " + n.Cond.String()
+		s.WriteString(" " + n.Cond.String())
 	}
 	for _, item := range n.List {
-		s += " " + item.String()
+		s.WriteString(" " + item.String())
 	}
-	return s + ")"
+	return s.String() + ")"
 }
 
 // JS writes JavaScript to writer.
@@ -761,11 +939,12 @@ type SwitchStmt struct {
 }
 
 func (n SwitchStmt) String() string {
-	s := "Stmt(switch " + n.Init.String()
+	var s strings.Builder
+	s.WriteString("Stmt(switch " + n.Init.String())
 	for _, clause := range n.List {
-		s += clause.String()
+		s.WriteString(clause.String())
 	}
-	return s + ")"
+	return s.String() + ")"
 }
 
 // JS writes JavaScript to writer.
@@ -972,39 +1151,89 @@ func (alias Alias) JS(w io.Writer) {
 	w.Write(alias.Binding)
 }
 
+// ImportAttribute is a key and value in the with clause of an import or export statement, such as type: "json".
+type ImportAttribute struct {
+	Key   []byte // identifier name or string literal
+	Value []byte // string literal
+}
+
+func (attr ImportAttribute) String() string {
+	return string(attr.Key) + ": " + string(attr.Value)
+}
+
+// JS writes JavaScript to writer.
+func (attr ImportAttribute) JS(w io.Writer) {
+	w.Write(attr.Key)
+	w.Write([]byte(": "))
+	w.Write(attr.Value)
+}
+
+func importAttributesString(attrs []ImportAttribute) string {
+	s := "with {"
+	for i, attr := range attrs {
+		if i != 0 {
+			s += " ,"
+		}
+		s += " " + attr.String()
+	}
+	return s + " }"
+}
+
+func importAttributesJS(w io.Writer, attrs []ImportAttribute) {
+	if len(attrs) == 0 {
+		w.Write([]byte("with {}"))
+		return
+	}
+	w.Write([]byte("with {"))
+	for i, attr := range attrs {
+		if i != 0 {
+			w.Write([]byte(","))
+		}
+		w.Write([]byte(" "))
+		attr.JS(w)
+	}
+	w.Write([]byte(" }"))
+}
+
 // ImportStmt is an import statement.
 type ImportStmt struct {
-	List    []Alias
-	Default []byte // can be nil
-	Module  []byte
+	List       []Alias
+	Default    []byte // can be nil
+	Module     []byte
+	Attributes []ImportAttribute // nil if there is no with clause
 }
 
 func (n ImportStmt) String() string {
-	s := "Stmt(import"
+	var s strings.Builder
+	s.WriteString("Stmt(import")
 	if n.Default != nil {
-		s += " " + string(n.Default)
+		s.WriteString(" " + string(n.Default))
 		if n.List != nil {
-			s += " ,"
+			s.WriteString(" ,")
 		}
 	}
 	if len(n.List) == 1 && len(n.List[0].Name) == 1 && n.List[0].Name[0] == '*' {
-		s += " " + n.List[0].String()
+		s.WriteString(" " + n.List[0].String())
 	} else if n.List != nil {
-		s += " {"
+		s.WriteString(" {")
 		for i, item := range n.List {
 			if i != 0 {
-				s += " ,"
+				s.WriteString(" ,")
 			}
 			if item.Binding != nil {
-				s += " " + item.String()
+				s.WriteString(" " + item.String())
 			}
 		}
-		s += " }"
+		s.WriteString(" }")
 	}
 	if n.Default != nil || n.List != nil {
-		s += " from"
+		s.WriteString(" from")
 	}
-	return s + " " + string(n.Module) + ")"
+	s.WriteString(" " + string(n.Module))
+	if n.Attributes != nil {
+		s.WriteString(" " + importAttributesString(n.Attributes))
+	}
+	return s.String() + ")"
 }
 
 // JS writes JavaScript to writer.
@@ -1045,15 +1274,20 @@ func (n ImportStmt) JS(w io.Writer) {
 	}
 	w.Write([]byte(" "))
 	w.Write(n.Module)
+	if n.Attributes != nil {
+		w.Write([]byte(" "))
+		importAttributesJS(w, n.Attributes)
+	}
 	w.Write([]byte(";"))
 }
 
 // ExportStmt is an export statement.
 type ExportStmt struct {
-	List    []Alias
-	Module  []byte // can be nil
-	Default bool
-	Decl    IExpr
+	List       []Alias
+	Module     []byte // can be nil
+	Default    bool
+	Decl       IExpr
+	Attributes []ImportAttribute // nil if there is no with clause
 }
 
 func (n ExportStmt) String() string {
@@ -1079,6 +1313,9 @@ func (n ExportStmt) String() string {
 	}
 	if n.Module != nil {
 		s += " from " + string(n.Module)
+	}
+	if n.Attributes != nil {
+		s += " " + importAttributesString(n.Attributes)
 	}
 	return s + ")"
 }
@@ -1118,6 +1355,10 @@ func (n ExportStmt) JS(w io.Writer) {
 	if n.Module != nil {
 		w.Write([]byte(" from "))
 		w.Write(n.Module)
+	}
+	if n.Attributes != nil {
+		w.Write([]byte(" "))
+		importAttributesJS(w, n.Attributes)
 	}
 	w.Write([]byte(";"))
 }
@@ -1217,22 +1458,23 @@ type BindingArray struct {
 }
 
 func (n BindingArray) String() string {
-	s := "["
+	var s strings.Builder
+	s.WriteString("[")
 	for i, item := range n.List {
 		if i != 0 {
-			s += ","
+			s.WriteString(",")
 		}
-		s += " " + item.String()
+		s.WriteString(" " + item.String())
 	}
 	if n.Rest != nil {
 		if len(n.List) != 0 {
-			s += ","
+			s.WriteString(",")
 		}
-		s += " ...Binding(" + n.Rest.String() + ")"
+		s.WriteString(" ...Binding(" + n.Rest.String() + ")")
 	} else if 0 < len(n.List) && n.List[len(n.List)-1].Binding == nil {
-		s += ","
+		s.WriteString(",")
 	}
-	return s + " ]"
+	return s.String() + " ]"
 }
 
 // JS writes JavaScript to writer.
@@ -1295,20 +1537,21 @@ type BindingObject struct {
 }
 
 func (n BindingObject) String() string {
-	s := "{"
+	var s strings.Builder
+	s.WriteString("{")
 	for i, item := range n.List {
 		if i != 0 {
-			s += ","
+			s.WriteString(",")
 		}
-		s += item.String()
+		s.WriteString(item.String())
 	}
 	if n.Rest != nil {
 		if len(n.List) != 0 {
-			s += ","
+			s.WriteString(",")
 		}
-		s += " ...Binding(" + string(n.Rest.Data) + ")"
+		s.WriteString(" ...Binding(" + string(n.Rest.Data) + ")")
 	}
-	return s + " }"
+	return s.String() + " }"
 }
 
 // JS writes JavaScript to writer.
@@ -1375,11 +1618,12 @@ type VarDecl struct {
 }
 
 func (n VarDecl) String() string {
-	s := "Decl(" + n.TokenType.String()
+	var s strings.Builder
+	s.WriteString("Decl(" + n.TokenType.String())
 	for _, item := range n.List {
-		s += " " + item.String()
+		s.WriteString(" " + item.String())
 	}
-	return s + ")"
+	return s.String() + ")"
 }
 
 // JS writes JavaScript to writer.
@@ -1401,20 +1645,21 @@ type Params struct {
 }
 
 func (n Params) String() string {
-	s := "Params("
+	var s strings.Builder
+	s.WriteString("Params(")
 	for i, item := range n.List {
 		if i != 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
-		s += item.String()
+		s.WriteString(item.String())
 	}
 	if n.Rest != nil {
 		if len(n.List) != 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
-		s += "...Binding(" + n.Rest.String() + ")"
+		s.WriteString("...Binding(" + n.Rest.String() + ")")
 	}
-	return s + ")"
+	return s.String() + ")"
 }
 
 // JS writes JavaScript to writer.
@@ -1586,7 +1831,7 @@ func (n MethodDecl) JS(w io.Writer) {
 type Field struct {
 	Static bool
 	Name   ClassElementName
-	Init   IExpr
+	Init   IExpr // can be nil
 }
 
 func (n Field) String() string {
@@ -1652,17 +1897,18 @@ type ClassDecl struct {
 }
 
 func (n ClassDecl) String() string {
-	s := "Decl(class"
+	var s strings.Builder
+	s.WriteString("Decl(class")
 	if n.Name != nil {
-		s += " " + string(n.Name.Data)
+		s.WriteString(" " + string(n.Name.Data))
 	}
 	if n.Extends != nil {
-		s += " extends " + n.Extends.String()
+		s.WriteString(" extends " + n.Extends.String())
 	}
 	for _, item := range n.List {
-		s += " " + item.String()
+		s.WriteString(" " + item.String())
 	}
-	return s + ")"
+	return s.String() + ")"
 }
 
 // JS writes JavaScript to writer.
@@ -1776,22 +2022,23 @@ type ArrayExpr struct {
 }
 
 func (n ArrayExpr) String() string {
-	s := "["
+	var s strings.Builder
+	s.WriteString("[")
 	for i, item := range n.List {
 		if i != 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
 		if item.Value != nil {
 			if item.Spread {
-				s += "..."
+				s.WriteString("...")
 			}
-			s += item.Value.String()
+			s.WriteString(item.Value.String())
 		}
 	}
 	if 0 < len(n.List) && n.List[len(n.List)-1].Value == nil {
-		s += ","
+		s.WriteString(",")
 	}
-	return s + "]"
+	return s.String() + "]"
 }
 
 // JS writes JavaScript to writer.
@@ -1916,14 +2163,15 @@ type ObjectExpr struct {
 }
 
 func (n ObjectExpr) String() string {
-	s := "{"
+	var s strings.Builder
+	s.WriteString("{")
 	for i, item := range n.List {
 		if i != 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
-		s += item.String()
+		s.WriteString(item.String())
 	}
-	return s + "}"
+	return s.String() + "}"
 }
 
 // JS writes JavaScript to writer.
@@ -1979,17 +2227,17 @@ type TemplateExpr struct {
 }
 
 func (n TemplateExpr) String() string {
-	s := ""
+	var s strings.Builder
 	if n.Tag != nil {
-		s += n.Tag.String()
+		s.WriteString(n.Tag.String())
 		if n.Optional {
-			s += "?."
+			s.WriteString("?.")
 		}
 	}
 	for _, item := range n.List {
-		s += item.String()
+		s.WriteString(item.String())
 	}
-	return s + string(n.Tail)
+	return s.String() + string(n.Tail)
 }
 
 // JS writes JavaScript to writer.
@@ -2161,14 +2409,15 @@ type Args struct {
 }
 
 func (n Args) String() string {
-	s := "("
+	var s strings.Builder
+	s.WriteString("(")
 	for i, item := range n.List {
 		if i != 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
-		s += item.String()
+		s.WriteString(item.String())
 	}
-	return s + ")"
+	return s.String() + ")"
 }
 
 // JS writes JavaScript to writer.
@@ -2385,14 +2634,15 @@ type CommaExpr struct {
 }
 
 func (n CommaExpr) String() string {
-	s := "("
+	var s strings.Builder
+	s.WriteString("(")
 	for i, item := range n.List {
 		if i != 0 {
-			s += ","
+			s.WriteString(",")
 		}
-		s += item.String()
+		s.WriteString(item.String())
 	}
-	return s + ")"
+	return s.String() + ")"
 }
 
 // JS writes JavaScript to writer.

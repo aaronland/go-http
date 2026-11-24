@@ -5,10 +5,10 @@ package iam
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Lists all IAM users, groups, and roles that the specified managed policy is
@@ -96,6 +96,33 @@ type ListEntitiesForPolicyInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListEntitiesForPolicyInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListEntitiesForPolicyRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListEntitiesForPolicyInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.EntityFilter != "" {
+		s.WriteString(schemas.ListEntitiesForPolicyRequest_EntityFilter, string(v.EntityFilter))
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListEntitiesForPolicyRequest_Marker, *v.Marker)
+	}
+	if v.MaxItems != nil {
+		s.WriteInt32(schemas.ListEntitiesForPolicyRequest_MaxItems, *v.MaxItems)
+	}
+	if v.PathPrefix != nil {
+		s.WriteString(schemas.ListEntitiesForPolicyRequest_PathPrefix, *v.PathPrefix)
+	}
+	if v.PolicyArn != nil {
+		s.WriteString(schemas.ListEntitiesForPolicyRequest_PolicyArn, *v.PolicyArn)
+	}
+	if v.PolicyUsageFilter != "" {
+		s.WriteString(schemas.ListEntitiesForPolicyRequest_PolicyUsageFilter, string(v.PolicyUsageFilter))
+	}
+}
+
 // Contains the response to a successful [ListEntitiesForPolicy] request.
 //
 // [ListEntitiesForPolicy]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListEntitiesForPolicy.html
@@ -128,77 +155,68 @@ type ListEntitiesForPolicyOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListEntitiesForPolicyOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListEntitiesForPolicyResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListEntitiesForPolicyOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListEntitiesForPolicyResponse_IsTruncated, v.IsTruncated)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListEntitiesForPolicyResponse_Marker, *v.Marker)
+	}
+	if v.PolicyGroups != nil {
+		serializePolicyGroupListType(s, schemas.ListEntitiesForPolicyResponse_PolicyGroups, v.PolicyGroups)
+	}
+	if v.PolicyRoles != nil {
+		serializePolicyRoleListType(s, schemas.ListEntitiesForPolicyResponse_PolicyRoles, v.PolicyRoles)
+	}
+	if v.PolicyUsers != nil {
+		serializePolicyUserListType(s, schemas.ListEntitiesForPolicyResponse_PolicyUsers, v.PolicyUsers)
+	}
+}
+func (v *ListEntitiesForPolicyOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListEntitiesForPolicyResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListEntitiesForPolicyResponse_IsTruncated:
+			return d.ReadBool(schemas.ListEntitiesForPolicyResponse_IsTruncated, &v.IsTruncated)
+		case schemas.ListEntitiesForPolicyResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListEntitiesForPolicyResponse_Marker, v.Marker)
+		case schemas.ListEntitiesForPolicyResponse_PolicyGroups:
+			return deserializePolicyGroupListType(d, schemas.ListEntitiesForPolicyResponse_PolicyGroups, &v.PolicyGroups)
+		case schemas.ListEntitiesForPolicyResponse_PolicyRoles:
+			return deserializePolicyRoleListType(d, schemas.ListEntitiesForPolicyResponse_PolicyRoles, &v.PolicyRoles)
+		case schemas.ListEntitiesForPolicyResponse_PolicyUsers:
+			return deserializePolicyUserListType(d, schemas.ListEntitiesForPolicyResponse_PolicyUsers, &v.PolicyUsers)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListEntitiesForPolicyMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListEntitiesForPolicy, schemas.ListEntitiesForPolicyRequest, schemas.ListEntitiesForPolicyResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListEntitiesForPolicy{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListEntitiesForPolicy, schemas.ListEntitiesForPolicyRequest, schemas.ListEntitiesForPolicyResponse), output: &ListEntitiesForPolicyOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListEntitiesForPolicy{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListEntitiesForPolicy"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpListEntitiesForPolicyValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListEntitiesForPolicy(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -211,12 +229,6 @@ func (c *Client) addOperationListEntitiesForPolicyMiddlewares(stack *middleware.
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -326,11 +338,3 @@ type ListEntitiesForPolicyAPIClient interface {
 }
 
 var _ ListEntitiesForPolicyAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opListEntitiesForPolicy(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListEntitiesForPolicy",
-	}
-}

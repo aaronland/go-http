@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Retrieves the specified SSH public key, including metadata about the key.
@@ -67,6 +66,24 @@ type GetSSHPublicKeyInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetSSHPublicKeyInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetSSHPublicKeyRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetSSHPublicKeyInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Encoding != "" {
+		s.WriteString(schemas.GetSSHPublicKeyRequest_Encoding, string(v.Encoding))
+	}
+	if v.SSHPublicKeyId != nil {
+		s.WriteString(schemas.GetSSHPublicKeyRequest_SSHPublicKeyId, *v.SSHPublicKeyId)
+	}
+	if v.UserName != nil {
+		s.WriteString(schemas.GetSSHPublicKeyRequest_UserName, *v.UserName)
+	}
+}
+
 // Contains the response to a successful [GetSSHPublicKey] request.
 //
 // [GetSSHPublicKey]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_GetSSHPublicKey.html
@@ -81,77 +98,50 @@ type GetSSHPublicKeyOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetSSHPublicKeyOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetSSHPublicKeyResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetSSHPublicKeyOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.SSHPublicKey != nil {
+		s.WriteStruct(schemas.GetSSHPublicKeyResponse_SSHPublicKey)
+		v.SSHPublicKey.SerializeMembers(s)
+		s.CloseStruct()
+	}
+}
+func (v *GetSSHPublicKeyOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.GetSSHPublicKeyResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.GetSSHPublicKeyResponse_SSHPublicKey:
+			v.SSHPublicKey = &types.SSHPublicKey{}
+			return v.SSHPublicKey.Deserialize(d)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationGetSSHPublicKeyMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetSSHPublicKey, schemas.GetSSHPublicKeyRequest, schemas.GetSSHPublicKeyResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpGetSSHPublicKey{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetSSHPublicKey, schemas.GetSSHPublicKeyRequest, schemas.GetSSHPublicKeyResponse), output: &GetSSHPublicKeyOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpGetSSHPublicKey{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GetSSHPublicKey"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetSSHPublicKeyValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetSSHPublicKey(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -166,22 +156,8 @@ func (c *Client) addOperationGetSSHPublicKeyMiddlewares(stack *middleware.Stack,
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opGetSSHPublicKey(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GetSSHPublicKey",
-	}
 }

@@ -4,10 +4,9 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Generates a report for service last accessed data for Organizations. You can
@@ -160,6 +159,21 @@ type GenerateOrganizationsAccessReportInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GenerateOrganizationsAccessReportInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GenerateOrganizationsAccessReportRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GenerateOrganizationsAccessReportInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.EntityPath != nil {
+		s.WriteString(schemas.GenerateOrganizationsAccessReportRequest_EntityPath, *v.EntityPath)
+	}
+	if v.OrganizationsPolicyId != nil {
+		s.WriteString(schemas.GenerateOrganizationsAccessReportRequest_OrganizationsPolicyId, *v.OrganizationsPolicyId)
+	}
+}
+
 type GenerateOrganizationsAccessReportOutput struct {
 
 	// The job identifier that you can use in the [GetOrganizationsAccessReport] operation.
@@ -173,77 +187,48 @@ type GenerateOrganizationsAccessReportOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GenerateOrganizationsAccessReportOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GenerateOrganizationsAccessReportResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GenerateOrganizationsAccessReportOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.JobId != nil {
+		s.WriteString(schemas.GenerateOrganizationsAccessReportResponse_JobId, *v.JobId)
+	}
+}
+func (v *GenerateOrganizationsAccessReportOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.GenerateOrganizationsAccessReportResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.GenerateOrganizationsAccessReportResponse_JobId:
+			v.JobId = new(string)
+			return d.ReadString(schemas.GenerateOrganizationsAccessReportResponse_JobId, v.JobId)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationGenerateOrganizationsAccessReportMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GenerateOrganizationsAccessReport, schemas.GenerateOrganizationsAccessReportRequest, schemas.GenerateOrganizationsAccessReportResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpGenerateOrganizationsAccessReport{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GenerateOrganizationsAccessReport, schemas.GenerateOrganizationsAccessReportRequest, schemas.GenerateOrganizationsAccessReportResponse), output: &GenerateOrganizationsAccessReportOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpGenerateOrganizationsAccessReport{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GenerateOrganizationsAccessReport"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGenerateOrganizationsAccessReportValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGenerateOrganizationsAccessReport(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -258,22 +243,8 @@ func (c *Client) addOperationGenerateOrganizationsAccessReportMiddlewares(stack 
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opGenerateOrganizationsAccessReport(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GenerateOrganizationsAccessReport",
-	}
 }

@@ -60,6 +60,7 @@ func Parse(r *parse.Input, o Options) (*AST, error) {
 			}
 			ast.BlockStmt.List = append(ast.BlockStmt.List, p.parseStmt(true))
 		}
+		p.exitScope(nil)
 	} else {
 		// catch shebang in first line
 		var shebang []byte
@@ -198,6 +199,7 @@ func (p *Parser) parseModule() (module BlockStmt) {
 				module.List = append(p.comments, module.List...)
 				p.comments = p.comments[:0]
 			}
+			p.exitScope(nil)
 			return
 		case ImportToken:
 			p.next()
@@ -214,7 +216,7 @@ func (p *Parser) parseModule() (module BlockStmt) {
 			} else if p.tt == DotToken {
 				p.next()
 				if !p.consume("import.meta expression", MetaToken) {
-					return module
+					return
 				}
 				left := &ImportMetaExpr{}
 				p.exprLevel++
@@ -644,11 +646,20 @@ func (p *Parser) parseStmt(allowDeclaration bool) (stmt IStmt) {
 			}
 		}
 	}
-	if !p.prevLT && p.tt == SemicolonToken {
+	if p.tt == SemicolonToken && (!p.prevLT || endsWithSemicolon(stmt)) {
 		p.next()
 	}
 	p.stmtLevel--
 	return
+}
+
+// endsWithSemicolon returns true for statements that are terminated by a semicolon. ASI only inserts a semicolon when the next token is not allowed, so a semicolon after a line terminator still ends these statements and is not an empty statement.
+func endsWithSemicolon(stmt IStmt) bool {
+	switch stmt.(type) {
+	case *ExprStmt, *VarDecl, *DoWhileStmt, *BranchStmt, *ReturnStmt, *ThrowStmt, *DebuggerStmt, *DirectivePrologueStmt:
+		return true
+	}
+	return false
 }
 
 func (p *Parser) parseStmtList(in string) (list []IStmt) {
@@ -761,10 +772,49 @@ func (p *Parser) parseImportStmt() (importStmt ImportStmt) {
 		importStmt.Module = p.data
 		p.next()
 	}
+	if p.tt == WithToken {
+		if importStmt.Attributes = p.parseWithClause("import statement"); importStmt.Attributes == nil {
+			return
+		}
+	}
 	if p.tt == SemicolonToken {
 		p.next()
 	}
 	return
+}
+
+// parseWithClause parses the import attributes of an import or export statement, it returns nil on error
+func (p *Parser) parseWithClause(in string) []ImportAttribute {
+	// assume we're at with
+	p.next()
+	if !p.consume(in, OpenBraceToken) {
+		return nil
+	}
+	attrs := []ImportAttribute{}
+	for p.tt != CloseBraceToken {
+		if !IsIdentifierName(p.tt) && p.tt != StringToken {
+			p.fail(in, IdentifierToken, StringToken, CloseBraceToken)
+			return nil
+		}
+		key := p.data
+		p.next()
+		if !p.consume(in, ColonToken) {
+			return nil
+		} else if p.tt != StringToken {
+			p.fail(in, StringToken)
+			return nil
+		}
+		attrs = append(attrs, ImportAttribute{key, p.data})
+		p.next()
+		if p.tt == CommaToken {
+			p.next()
+		} else if p.tt != CloseBraceToken {
+			p.fail(in, CommaToken, CloseBraceToken)
+			return nil
+		}
+	}
+	p.next()
+	return attrs
 }
 
 func (p *Parser) parseExportStmt() (exportStmt ExportStmt) {
@@ -827,6 +877,11 @@ func (p *Parser) parseExportStmt() (exportStmt ExportStmt) {
 			}
 			exportStmt.Module = p.data
 			p.next()
+			if p.tt == WithToken {
+				if exportStmt.Attributes = p.parseWithClause("export statement"); exportStmt.Attributes == nil {
+					return
+				}
+			}
 		}
 	} else if p.tt == VarToken || p.tt == ConstToken || p.tt == LetToken {
 		tt := p.tt
@@ -1559,8 +1614,24 @@ func (p *Parser) parseIdentifierArrowFunc(v *Var) (arrowFunc *ArrowFunc) {
 	} else {
 		// if v.Uses==1 it must be undeclared and be the last added
 		p.scope.Parent.Undeclared = p.scope.Parent.Undeclared[:len(p.scope.Parent.Undeclared)-1]
+		if p.scope.Parent.VarIndices != nil {
+			index := -len(p.scope.Parent.Undeclared) - 1
+			for name, indices := range p.scope.Parent.VarIndices {
+				var updated bool
+				for i := 0; i < len(indices); i++ {
+					if indices[i] == index {
+						indices = append(indices[:i], indices[i+1:]...)
+						updated = true
+						i--
+					}
+				}
+				if updated {
+					p.scope.Parent.VarIndices[name] = indices
+				}
+			}
+		}
 		v.Decl = ArgumentDecl
-		p.scope.Declared = append(p.scope.Declared, v)
+		p.scope.addDeclared(v)
 	}
 
 	arrowFunc.Params.List = []BindingElement{{v, nil}}
@@ -1895,7 +1966,11 @@ func (p *Parser) parseExpressionSuffix(left IExpr, prec, precLeft OpPrec) IExpr 
 				return nil
 			}
 			p.next()
+			// the right-hand side is never a binding, even when the left-hand side is a binding pattern with an initializer in arrow function parameters
+			prevAssumeArrowFunc := p.assumeArrowFunc
+			p.assumeArrowFunc = false
 			left = &BinaryExpr{tt, left, p.parseExpression(OpAssign)}
+			p.assumeArrowFunc = prevAssumeArrowFunc && tt == EqToken
 			precLeft = OpAssign
 		case LtToken, LtEqToken, GtToken, GtEqToken, InToken, InstanceofToken:
 			if OpCompare < prec || !p.in && tt == InToken {
@@ -2037,7 +2112,7 @@ func (p *Parser) parseExpressionSuffix(left IExpr, prec, precLeft OpPrec) IExpr 
 				left = &DotExpr{left, LiteralExpr{IdentifierToken, p.data}, OpOpt, true}
 				p.next()
 			} else if p.tt == PrivateIdentifierToken {
-				left = &DotExpr{left, LiteralExpr{p.tt, p.data}, OpOpt, true}
+				left = &DotExpr{left, p.scope.Use(p.data), OpOpt, true}
 				p.next()
 			} else {
 				p.fail("optional chaining expression", IdentifierToken, OpenParenToken, OpenBracketToken, TemplateToken)

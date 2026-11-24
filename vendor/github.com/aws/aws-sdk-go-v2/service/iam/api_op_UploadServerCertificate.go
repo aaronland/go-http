@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Uploads a server certificate entity for the Amazon Web Services account. The
@@ -158,6 +157,33 @@ type UploadServerCertificateInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *UploadServerCertificateInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.UploadServerCertificateRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *UploadServerCertificateInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.CertificateBody != nil {
+		s.WriteString(schemas.UploadServerCertificateRequest_CertificateBody, *v.CertificateBody)
+	}
+	if v.CertificateChain != nil {
+		s.WriteString(schemas.UploadServerCertificateRequest_CertificateChain, *v.CertificateChain)
+	}
+	if v.Path != nil {
+		s.WriteString(schemas.UploadServerCertificateRequest_Path, *v.Path)
+	}
+	if v.PrivateKey != nil {
+		s.WriteString(schemas.UploadServerCertificateRequest_PrivateKey, *v.PrivateKey)
+	}
+	if v.ServerCertificateName != nil {
+		s.WriteString(schemas.UploadServerCertificateRequest_ServerCertificateName, *v.ServerCertificateName)
+	}
+	if v.Tags != nil {
+		serializetagListType(s, schemas.UploadServerCertificateRequest_Tags, v.Tags)
+	}
+}
+
 // Contains the response to a successful [UploadServerCertificate] request.
 //
 // [UploadServerCertificate]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_UploadServerCertificate.html
@@ -180,77 +206,55 @@ type UploadServerCertificateOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *UploadServerCertificateOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.UploadServerCertificateResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *UploadServerCertificateOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.ServerCertificateMetadata != nil {
+		s.WriteStruct(schemas.UploadServerCertificateResponse_ServerCertificateMetadata)
+		v.ServerCertificateMetadata.SerializeMembers(s)
+		s.CloseStruct()
+	}
+	if v.Tags != nil {
+		serializetagListType(s, schemas.UploadServerCertificateResponse_Tags, v.Tags)
+	}
+}
+func (v *UploadServerCertificateOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.UploadServerCertificateResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.UploadServerCertificateResponse_ServerCertificateMetadata:
+			v.ServerCertificateMetadata = &types.ServerCertificateMetadata{}
+			return v.ServerCertificateMetadata.Deserialize(d)
+		case schemas.UploadServerCertificateResponse_Tags:
+			return deserializetagListType(d, schemas.UploadServerCertificateResponse_Tags, &v.Tags)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationUploadServerCertificateMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.UploadServerCertificate, schemas.UploadServerCertificateRequest, schemas.UploadServerCertificateResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpUploadServerCertificate{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.UploadServerCertificate, schemas.UploadServerCertificateRequest, schemas.UploadServerCertificateResponse), output: &UploadServerCertificateOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpUploadServerCertificate{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "UploadServerCertificate"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpUploadServerCertificateValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opUploadServerCertificate(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -265,22 +269,8 @@ func (c *Client) addOperationUploadServerCertificateMiddlewares(stack *middlewar
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opUploadServerCertificate(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "UploadServerCertificate",
-	}
 }

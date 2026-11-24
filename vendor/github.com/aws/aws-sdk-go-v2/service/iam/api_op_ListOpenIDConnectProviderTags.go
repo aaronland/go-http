@@ -5,10 +5,10 @@ package iam
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Lists the tags that are attached to the specified OpenID Connect
@@ -68,6 +68,24 @@ type ListOpenIDConnectProviderTagsInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListOpenIDConnectProviderTagsInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListOpenIDConnectProviderTagsRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListOpenIDConnectProviderTagsInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Marker != nil {
+		s.WriteString(schemas.ListOpenIDConnectProviderTagsRequest_Marker, *v.Marker)
+	}
+	if v.MaxItems != nil {
+		s.WriteInt32(schemas.ListOpenIDConnectProviderTagsRequest_MaxItems, *v.MaxItems)
+	}
+	if v.OpenIDConnectProviderArn != nil {
+		s.WriteString(schemas.ListOpenIDConnectProviderTagsRequest_OpenIDConnectProviderArn, *v.OpenIDConnectProviderArn)
+	}
+}
+
 type ListOpenIDConnectProviderTagsOutput struct {
 
 	// The list of tags that are currently attached to the OpenID Connect (OIDC)
@@ -96,77 +114,58 @@ type ListOpenIDConnectProviderTagsOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListOpenIDConnectProviderTagsOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListOpenIDConnectProviderTagsResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListOpenIDConnectProviderTagsOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListOpenIDConnectProviderTagsResponse_IsTruncated, v.IsTruncated)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListOpenIDConnectProviderTagsResponse_Marker, *v.Marker)
+	}
+	if v.Tags != nil {
+		serializetagListType(s, schemas.ListOpenIDConnectProviderTagsResponse_Tags, v.Tags)
+	}
+}
+func (v *ListOpenIDConnectProviderTagsOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListOpenIDConnectProviderTagsResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListOpenIDConnectProviderTagsResponse_IsTruncated:
+			return d.ReadBool(schemas.ListOpenIDConnectProviderTagsResponse_IsTruncated, &v.IsTruncated)
+		case schemas.ListOpenIDConnectProviderTagsResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListOpenIDConnectProviderTagsResponse_Marker, v.Marker)
+		case schemas.ListOpenIDConnectProviderTagsResponse_Tags:
+			return deserializetagListType(d, schemas.ListOpenIDConnectProviderTagsResponse_Tags, &v.Tags)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListOpenIDConnectProviderTagsMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListOpenIDConnectProviderTags, schemas.ListOpenIDConnectProviderTagsRequest, schemas.ListOpenIDConnectProviderTagsResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListOpenIDConnectProviderTags{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListOpenIDConnectProviderTags, schemas.ListOpenIDConnectProviderTagsRequest, schemas.ListOpenIDConnectProviderTagsResponse), output: &ListOpenIDConnectProviderTagsOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListOpenIDConnectProviderTags{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListOpenIDConnectProviderTags"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpListOpenIDConnectProviderTagsValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListOpenIDConnectProviderTags(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -179,12 +178,6 @@ func (c *Client) addOperationListOpenIDConnectProviderTagsMiddlewares(stack *mid
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -296,11 +289,3 @@ type ListOpenIDConnectProviderTagsAPIClient interface {
 }
 
 var _ ListOpenIDConnectProviderTagsAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opListOpenIDConnectProviderTags(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListOpenIDConnectProviderTags",
-	}
-}

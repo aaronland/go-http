@@ -3,10 +3,12 @@ package js
 import (
 	"bytes"
 	"encoding/hex"
+	"slices"
 	stdStrconv "strconv"
 	"unicode/utf8"
 
 	"github.com/tdewolff/minify/v2"
+	"github.com/tdewolff/parse/v2"
 	"github.com/tdewolff/parse/v2/js"
 	"github.com/tdewolff/parse/v2/strconv"
 )
@@ -19,7 +21,6 @@ var (
 	plusPlusBytes              = []byte("++")
 	minMinBytes                = []byte("--")
 	expBytes                   = []byte("**")
-	bitOrBytes                 = []byte("|")
 	colonBytes                 = []byte(":")
 	semicolonBytes             = []byte(";")
 	commaBytes                 = []byte(",")
@@ -64,6 +65,7 @@ var (
 	importBytes                = []byte("import")
 	exportBytes                = []byte("export")
 	fromBytes                  = []byte("from")
+	withBytes                  = []byte("with")
 	returnBytes                = []byte("return")
 	classBytes                 = []byte("class")
 	asSpaceBytes               = []byte("as ")
@@ -88,7 +90,8 @@ var (
 	notOneBytes                = []byte("!1")
 	groupedNotOneBytes         = []byte("(!1)")
 	debuggerBytes              = []byte("debugger")
-	regExpScriptBytes          = []byte("/script>")
+	regExpScriptBytes          = []byte("/script")
+	regExpCommentBytes         = []byte("!--")
 	isNaNBytes                 = []byte("isNaN")
 	NumberBytes                = []byte("Number")
 	MathBytes                  = []byte("Math")
@@ -211,6 +214,9 @@ var binaryLeftPrecMap = map[js.TokenType]js.OpPrec{
 	js.AndToken:        js.OpAnd,
 	js.OrToken:         js.OpOr,
 	js.NullishToken:    js.OpBitOr, // or OpCoalesce
+	js.AndEqToken:      js.OpLHS,
+	js.OrEqToken:       js.OpLHS,
+	js.NullishEqToken:  js.OpLHS,
 	js.CommaToken:      js.OpExpr,
 }
 
@@ -253,6 +259,9 @@ var binaryRightPrecMap = map[js.TokenType]js.OpPrec{
 	js.AndToken:        js.OpAnd,   // changes order in AST but not in execution
 	js.OrToken:         js.OpOr,    // changes order in AST but not in execution
 	js.NullishToken:    js.OpBitOr, // or OpCoalesce
+	js.AndEqToken:      js.OpAssign,
+	js.OrEqToken:       js.OpAssign,
+	js.NullishEqToken:  js.OpAssign,
 	js.CommaToken:      js.OpAssign,
 }
 
@@ -366,10 +375,8 @@ func hasSideEffects(i js.IExpr) bool {
 	case *js.CondExpr:
 		return hasSideEffects(expr.Cond) || hasSideEffects(expr.X) || hasSideEffects(expr.Y)
 	case *js.CommaExpr:
-		for _, item := range expr.List {
-			if hasSideEffects(item) {
-				return true
-			}
+		if slices.ContainsFunc(expr.List, hasSideEffects) {
+			return true
 		}
 	case *js.ArrayExpr:
 		for _, item := range expr.List {
@@ -401,7 +408,10 @@ func hasSideEffects(i js.IExpr) bool {
 		}
 		return hasSideEffects(expr.X)
 	case *js.BinaryExpr:
-		return binaryOpPrecMap[expr.Op] == js.OpAssign
+		if binaryOpPrecMap[expr.Op] == js.OpAssign {
+			return true
+		}
+		return hasSideEffects(expr.X) || hasSideEffects(expr.Y)
 	}
 	return true
 }
@@ -633,7 +643,8 @@ func isFalsy(i js.IExpr) (bool, bool) {
 	if lit, ok := i.(*js.LiteralExpr); ok {
 		tt := lit.TokenType
 		d := lit.Data
-		if tt == js.FalseToken || tt == js.NullToken || tt == js.StringToken && len(lit.Data) == 0 {
+		if tt == js.FalseToken || tt == js.NullToken || tt == js.StringToken && len(lit.Data) == 2 {
+			// lit.Data includes the quotes, so "" and '' have length 2
 			return !negated, true // falsy
 		} else if tt == js.TrueToken || tt == js.StringToken {
 			return negated, true // truthy
@@ -653,6 +664,22 @@ func isFalsy(i js.IExpr) (bool, bool) {
 		return !negated, true // falsy
 	}
 	return false, false // unknown
+}
+
+// hasSpreadArg returns true if any argument is a spread (...x).
+func hasSpreadArg(args js.Args) bool {
+	for _, arg := range args.List {
+		if arg.Rest {
+			return true
+		}
+	}
+	return false
+}
+
+// isNumericLiteral returns true for number literals such as 2, .5, 1e3, 0x10, but not BigInts. They are never negative.
+func isNumericLiteral(expr js.IExpr) bool {
+	lit, ok := expr.(*js.LiteralExpr)
+	return ok && js.NumericToken < lit.TokenType && lit.TokenType <= js.IntegerToken && lit.Data[len(lit.Data)-1] != 'n'
 }
 
 func isBooleanExpr(expr js.IExpr) bool {
@@ -936,7 +963,7 @@ func mergeBinaryExpr(expr *js.BinaryExpr) {
 	}
 }
 
-func minifyString(b []byte, allowTemplate bool) []byte {
+func minifyString(b []byte, allowTemplate, escapeHTML bool) []byte {
 	if len(b) < 3 {
 		return []byte("\"\"")
 	}
@@ -1023,10 +1050,10 @@ func minifyString(b []byte, allowTemplate bool) []byte {
 	b[len(b)-1] = quote
 
 	// strip unnecessary escapes
-	return replaceEscapes(b, quote, 1, 1)
+	return replaceEscapes(b, quote, 1, 1, escapeHTML)
 }
 
-func replaceEscapes(b []byte, quote byte, prefix, suffix int) []byte {
+func replaceEscapes(b []byte, quote byte, prefix, suffix int, escapeHTML bool) []byte {
 	// strip unnecessary escapes
 	j := 0
 	start := 0
@@ -1118,7 +1145,7 @@ func replaceEscapes(b []byte, quote byte, prefix, suffix int) []byte {
 					if m == -1 {
 						i++
 						continue
-					} else if num < 256 && quote == byte(num) {
+					} else if num == '\\' || num < 256 && quote == byte(num) {
 						b[i] = '\\'
 						i++
 						n--
@@ -1201,28 +1228,25 @@ func replaceEscapes(b []byte, quote byte, prefix, suffix int) []byte {
 				i++
 				b[i] = c // was overwritten above
 			}
-		} else if c == '<' && 9 <= len(b)-1-i {
-			if b[i+1] == '\\' && 10 <= len(b)-1-i && bytes.Equal(b[i+2:i+10], []byte("/script>")) {
-				i += 9
-			} else if bytes.Equal(b[i+1:i+9], []byte("/script>")) {
-				i++
-				if j < start {
-					// avoid append
-					j += copy(b[j:], b[start:i])
-					b[j] = '\\'
-					j++
-					start = i
-				} else {
-					b = append(append(b[:i], '\\'), b[i:]...)
-					i++
-					b[i] = '/' // was overwritten above
-				}
-			}
 		}
 	}
 	if start != 0 {
 		j += copy(b[j:], b[start:])
-		return b[:j]
+		b = b[:j]
+	}
+	if escapeHTML {
+		// TODO: not optimised, integrate above?
+		for i := 0; i < len(b); i++ {
+			if b[i] == '<' {
+				if i+3 < len(b) && bytes.Equal(b[i+1:i+4], []byte("!--")) {
+					b = append(append(b[:i+1], '\\'), b[i+1:]...)
+					b[i+2] = '!' // war overwritten above
+				} else if i+7 < len(b) && parse.EqualFold(b[i+1:i+8], []byte("/script")) {
+					b = append(append(b[:i+1], '\\'), b[i+1:]...)
+					b[i+2] = '/' // war overwritten above
+				}
+			}
+		}
 	}
 	return b
 }
@@ -1315,7 +1339,7 @@ var regexpClassEscapeTable = [256]bool{
 	false, false, false, false, false, false, false, false,
 }
 
-func minifyRegExp(b []byte) []byte {
+func minifyRegExp(b []byte, escapeHTML bool) []byte {
 	inClass := false
 	afterDash := 0
 	iClass := 0
@@ -1350,10 +1374,25 @@ func minifyRegExp(b []byte) []byte {
 			iClass = i
 		} else if inClass && b[i] == ']' {
 			inClass = false
-		} else if b[i] == '/' {
-			break
 		} else if inClass && 2 < afterDash && b[i] == '-' {
 			afterDash = 0
+		}
+	}
+	if escapeHTML {
+		// /[</script]/ => /[<\/script]/
+		// /<!--/ => /<\!--/
+		for i := 0; i < len(b); i++ {
+			if b[i] == '<' {
+				if i+4 <= len(b) && bytes.Equal(b[i+1:i+4], regExpCommentBytes) {
+					b = append(b[:i+2], b[i+1:]...)
+					b[i+1] = '\\'
+					i += 3
+				} else if i+8 <= len(b) && parse.EqualFold(b[i+1:i+8], regExpScriptBytes) {
+					b = append(b[:i+2], b[i+1:]...)
+					b[i+1] = '\\'
+					i += 9
+				}
+			}
 		}
 	}
 	return b

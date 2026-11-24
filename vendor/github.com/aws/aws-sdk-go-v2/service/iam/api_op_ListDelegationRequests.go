@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Lists delegation requests based on the specified criteria.
@@ -60,6 +59,24 @@ type ListDelegationRequestsInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListDelegationRequestsInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListDelegationRequestsRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListDelegationRequestsInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Marker != nil {
+		s.WriteString(schemas.ListDelegationRequestsRequest_Marker, *v.Marker)
+	}
+	if v.MaxItems != nil {
+		s.WriteInt32(schemas.ListDelegationRequestsRequest_MaxItems, *v.MaxItems)
+	}
+	if v.OwnerId != nil {
+		s.WriteString(schemas.ListDelegationRequestsRequest_OwnerId, *v.OwnerId)
+	}
+}
+
 type ListDelegationRequestsOutput struct {
 
 	// A list of delegation requests that match the specified criteria.
@@ -80,74 +97,55 @@ type ListDelegationRequestsOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListDelegationRequestsOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListDelegationRequestsResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListDelegationRequestsOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.DelegationRequests != nil {
+		serializedelegationRequestsListType(s, schemas.ListDelegationRequestsResponse_DelegationRequests, v.DelegationRequests)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListDelegationRequestsResponse_Marker, *v.Marker)
+	}
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListDelegationRequestsResponse_isTruncated, v.IsTruncated)
+	}
+}
+func (v *ListDelegationRequestsOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListDelegationRequestsResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListDelegationRequestsResponse_DelegationRequests:
+			return deserializedelegationRequestsListType(d, schemas.ListDelegationRequestsResponse_DelegationRequests, &v.DelegationRequests)
+		case schemas.ListDelegationRequestsResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListDelegationRequestsResponse_Marker, v.Marker)
+		case schemas.ListDelegationRequestsResponse_isTruncated:
+			return d.ReadBool(schemas.ListDelegationRequestsResponse_isTruncated, &v.IsTruncated)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListDelegationRequestsMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListDelegationRequests, schemas.ListDelegationRequestsRequest, schemas.ListDelegationRequestsResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListDelegationRequests{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListDelegationRequests, schemas.ListDelegationRequestsRequest, schemas.ListDelegationRequestsResponse), output: &ListDelegationRequestsOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListDelegationRequests{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListDelegationRequests"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListDelegationRequests(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -162,22 +160,8 @@ func (c *Client) addOperationListDelegationRequestsMiddlewares(stack *middleware
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opListDelegationRequests(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListDelegationRequests",
-	}
 }

@@ -47,7 +47,7 @@ func newRenamer(rename, useCharFreq bool) *renamer {
 	}
 }
 
-func (r *renamer) renameScope(scope js.Scope) {
+func (r *renamer) renameScope(scope *js.Scope) {
 	if !r.rename {
 		return
 	}
@@ -58,7 +58,7 @@ func (r *renamer) renameScope(scope js.Scope) {
 	for _, v := range scope.Declared {
 		v.Data = r.getName(v.Data, i)
 		i++
-		for r.isReserved(v.Data, scope.Undeclared) {
+		for r.isReserved(v.Data, scope) {
 			v.Data = r.getName(v.Data, i)
 			i++
 		}
@@ -66,7 +66,7 @@ func (r *renamer) renameScope(scope js.Scope) {
 }
 
 // rename all private elements in a class
-func (r *renamer) renameClassScope(scope js.Scope) {
+func (r *renamer) renameClassScope(scope *js.Scope) {
 	if !r.rename {
 		return
 	}
@@ -79,13 +79,25 @@ func (r *renamer) renameClassScope(scope js.Scope) {
 	}
 }
 
-func (r *renamer) isReserved(name []byte, undeclared js.VarArray) bool {
+func (r *renamer) isReserved(name []byte, scope *js.Scope) bool {
 	if 1 < len(name) { // there are no keywords or known globals that are one character long
 		if _, ok := r.reserved[string(name)]; ok {
 			return true
 		}
 	}
-	for _, v := range undeclared {
+	//if scope.VarIndices != nil {
+	//	for _, index := range scope.VarIndices[string(name)] {
+	//		v := scope.Undeclared[index]
+	//		for v.Link != nil {
+	//			v = v.Link
+	//		}
+	//		if !bytes.Equal(v.Data, name) {
+	//			panic("oops")
+	//		}
+	//		return true
+	//	}
+	//} else {
+	for _, v := range scope.Undeclared {
 		for v.Link != nil {
 			v = v.Link
 		}
@@ -93,6 +105,7 @@ func (r *renamer) isReserved(name []byte, undeclared js.VarArray) bool {
 			return true
 		}
 	}
+	//}
 	return false
 }
 
@@ -233,6 +246,10 @@ func appendBindingVars(vs []*js.Var, ibinding js.IBinding) []*js.Var {
 func appendExprVars(vs []*js.Var, iexpr js.IExpr) []*js.Var {
 	switch expr := iexpr.(type) {
 	case *js.Var:
+		// uses inside parentheses are parsed as new variables that link to the declared one
+		for expr.Link != nil {
+			expr = expr.Link
+		}
 		vs = append(vs, expr)
 	case *js.ArrayExpr:
 		for _, item := range expr.List {
@@ -550,23 +567,44 @@ func (m *jsMinifier) hoistVars(body *js.BlockStmt) {
 	}
 }
 
+// moveDestructuringFront moves the first array/object binding to the front of the declaration list, but skips a binding whose initializer reads a variable declared by an earlier item (#939, #1067). It returns true if the first item is an array/object binding.
+func moveDestructuringFront(decl *js.VarDecl) bool {
+	var refs []*js.Var
+	var bindings []*js.Var
+	for i, item := range decl.List {
+		if _, ok := item.Binding.(*js.Var); !ok {
+			// is array or object assignment
+			if i == 0 {
+				return true
+			}
+			interferes := false
+			if item.Default != nil {
+				refs = appendExprVars(refs[:0], item.Default)
+				for _, ref := range refs {
+					if slices.Contains(bindings, ref) {
+						interferes = true
+						break
+					}
+				}
+			}
+			if !interferes {
+				// put current item to the front but otherwise maintain order
+				copy(decl.List[1:], decl.List[:i])
+				decl.List[0] = item
+				return true
+			}
+		}
+		bindings = appendBindingVars(bindings, item.Binding)
+	}
+	return false
+}
+
 func (m *jsMinifier) optimizeVarOrder(decl *js.VarDecl) {
 	if decl.TokenType == js.VarToken {
 		// rearrange to put array/object first
 		start := 0
-		for i, item := range decl.List {
-			if _, ok := item.Binding.(*js.Var); !ok {
-				if i == 0 {
-					// no-op
-				} else if i == 1 {
-					decl.List[0], decl.List[1] = decl.List[1], decl.List[0]
-				} else if 1 < i {
-					copy(decl.List[1:], decl.List[:i])
-					decl.List[0] = item
-				}
-				start = 1
-				break
-			}
+		if moveDestructuringFront(decl) {
+			start = 1
 		}
 
 		// sort variable names to optimize gzip compression
@@ -594,39 +632,6 @@ func (m *jsMinifier) optimizeVarOrder(decl *js.VarDecl) {
 		})
 	} else if _, ok := decl.List[0].Binding.(*js.Var); ok {
 		// rearrange to put array/object first for let or const assignment
-		var refs []*js.Var
-		var bindings []*js.Var
-		for i, item := range decl.List {
-			if _, ok := item.Binding.(*js.Var); !ok {
-				// is array or object assignment
-				if i != 0 {
-					interferes := false
-					if item.Default != nil {
-						refs = appendExprVars(refs[:0], item.Default)
-						for _, ref := range refs {
-							for _, binding := range bindings {
-								if binding == ref {
-									interferes = true
-									break
-								}
-							}
-						}
-					}
-					if !interferes {
-						// put current item to the front but otherwise maintain order
-						if i == 1 {
-							decl.List[0], decl.List[1] = decl.List[1], decl.List[0]
-						} else {
-							copy(decl.List[1:], decl.List[:i])
-							decl.List[0] = item
-						}
-						break
-					}
-				} else {
-					break
-				}
-			}
-			bindings = appendBindingVars(bindings, item.Binding)
-		}
+		moveDestructuringFront(decl)
 	}
 }

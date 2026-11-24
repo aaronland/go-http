@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Retrieves information about when the specified access key was last used. The
@@ -45,6 +44,18 @@ type GetAccessKeyLastUsedInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetAccessKeyLastUsedInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetAccessKeyLastUsedRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetAccessKeyLastUsedInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.AccessKeyId != nil {
+		s.WriteString(schemas.GetAccessKeyLastUsedRequest_AccessKeyId, *v.AccessKeyId)
+	}
+}
+
 // Contains the response to a successful [GetAccessKeyLastUsed] request. It is also returned as a member
 // of the [AccessKeyMetaData]structure returned by the [ListAccessKeys] action.
 //
@@ -65,77 +76,56 @@ type GetAccessKeyLastUsedOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetAccessKeyLastUsedOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetAccessKeyLastUsedResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetAccessKeyLastUsedOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.AccessKeyLastUsed != nil {
+		s.WriteStruct(schemas.GetAccessKeyLastUsedResponse_AccessKeyLastUsed)
+		v.AccessKeyLastUsed.SerializeMembers(s)
+		s.CloseStruct()
+	}
+	if v.UserName != nil {
+		s.WriteString(schemas.GetAccessKeyLastUsedResponse_UserName, *v.UserName)
+	}
+}
+func (v *GetAccessKeyLastUsedOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.GetAccessKeyLastUsedResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.GetAccessKeyLastUsedResponse_AccessKeyLastUsed:
+			v.AccessKeyLastUsed = &types.AccessKeyLastUsed{}
+			return v.AccessKeyLastUsed.Deserialize(d)
+		case schemas.GetAccessKeyLastUsedResponse_UserName:
+			v.UserName = new(string)
+			return d.ReadString(schemas.GetAccessKeyLastUsedResponse_UserName, v.UserName)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationGetAccessKeyLastUsedMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetAccessKeyLastUsed, schemas.GetAccessKeyLastUsedRequest, schemas.GetAccessKeyLastUsedResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpGetAccessKeyLastUsed{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetAccessKeyLastUsed, schemas.GetAccessKeyLastUsedRequest, schemas.GetAccessKeyLastUsedResponse), output: &GetAccessKeyLastUsedOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpGetAccessKeyLastUsed{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GetAccessKeyLastUsed"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetAccessKeyLastUsedValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetAccessKeyLastUsed(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -150,22 +140,8 @@ func (c *Client) addOperationGetAccessKeyLastUsedMiddlewares(stack *middleware.S
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opGetAccessKeyLastUsed(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GetAccessKeyLastUsed",
-	}
 }
