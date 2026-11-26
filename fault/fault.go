@@ -1,3 +1,5 @@
+// Package fault provides HTTP handlers and middleware for reporting errors in web applications,
+// optionally rendering them with a custom HTML template.
 package fault
 
 import (
@@ -22,15 +24,17 @@ type FaultHandlerOptions struct {
 	Logger *log.Logger
 	// Template is an optional `html/template.Template` to use for reporting errors.
 	Template *template.Template
-	// VarFunc is a `FaultHandlerVarsFunc` used to derive variables passed to templates. Required if `Template` is non-nil.
+	// VarsFunc is a `FaultHandlerVarsFunc` used to derive variables passed to templates. Required if `Template` is non-nil.
 	VarsFunc FaultHandlerVarsFunc
 }
 
-// FaultHandlerVars are the minimal required variables that will be pass to a fault handler template. If you need to pass additional fields
-// then you will need to create your handler using the the `FaultHandlerWithOptions` method specifying a custom `FaultHandlerVarsFunc` property.
+// FaultHandlerVars are the minimal required variables that will be passed to a fault handler template. If you need to pass additional fields
+// then you will need to create your handler using the `FaultHandlerWithOptions` method specifying a custom `FaultHandlerVarsFunc` property.
 type FaultHandlerVars struct {
+	// Status is the HTTP status code of the error being reported.
 	Status int
-	Error  error
+	// Error is the public error being reported.
+	Error error
 }
 
 // FaultHandlerVarsFunc is a custom function that returns a pointer to a struct that conforms to the required fields of the `FaultHandlerVars` struct type.
@@ -78,7 +82,7 @@ func defaultFaultHandlerVars() any {
 	}
 }
 
-// AssignError assigns 'err' and 'status' the `ErrorKey` and `StatusKey` values of 'req.Context'
+// AssignError assigns 'err' and 'status' to the `ErrorKey` and `StatusKey` values of 'req.Context'
 // and updates 'req' in place.
 func AssignError(req *http.Request, err error, status int) {
 
@@ -90,7 +94,8 @@ func AssignError(req *http.Request, err error, status int) {
 	*req = *new_req
 }
 
-// RetrieveError returns the values of the `StatusKey` and `ErrorKey` values of 'req.Context'
+// RetrieveError returns the `StatusKey` and `ErrorKey` values of 'req.Context' as a status code and an error.
+// If either value is missing a status of `http.StatusInternalServerError` and a generic error are used instead.
 func RetrieveError(req *http.Request) (int, error) {
 
 	ctx := req.Context()
@@ -141,9 +146,9 @@ func TemplatedFaultHandler(l *log.Logger, t *template.Template) http.Handler {
 	return FaultHandlerWithOptions(opts)
 }
 
-// faultHandler returns a `http.Handler` for handling errors in a web application. It will retrieve
-// and "public" and "private" errors that have been recorded and log them to 'l'. If 't is defined it
-// will executed and passed the "public" error as a template variable.
+// FaultHandlerWithOptions returns a `http.Handler` for handling errors in a web application. It will retrieve
+// any "public" and "private" errors that have been recorded and log the private error to 'opts.Logger'. If 'opts.Template' is
+// defined it will be executed and passed the "public" error and status as template variables.
 func FaultHandlerWithOptions(opts *FaultHandlerOptions) http.Handler {
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {

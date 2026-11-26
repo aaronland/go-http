@@ -9,6 +9,7 @@ import (
 	"github.com/aaronland/go-http/v4/rewrite"
 )
 
+// OpenSearchHandler returns an `http.Handler` that serves 'desc' as an XML OpenSearch description document.
 func OpenSearchHandler(desc *OpenSearchDescription) (http.Handler, error) {
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {
@@ -28,6 +29,9 @@ func OpenSearchHandler(desc *OpenSearchDescription) (http.Handler, error) {
 	return h, nil
 }
 
+// AppendOpenSearchPluginsHandler returns a middleware `http.Handler` that serves 'next' with a `<link rel="search">`
+// element added to the `<head>` of HTML responses for each OpenSearch description in 'plugins'. The keys of 'plugins'
+// are the URIs of the corresponding description documents.
 func AppendOpenSearchPluginsHandler(next http.Handler, plugins map[string]*OpenSearchDescription) http.Handler {
 
 	var cb rewrite.RewriteHTMLFunc

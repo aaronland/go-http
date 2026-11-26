@@ -1,3 +1,4 @@
+// Package rollup provides HTTP handlers that combine and minify multiple JavaScript or CSS files into a single response.
 package rollup
 
 import (
@@ -10,11 +11,16 @@ import (
 	"github.com/tdewolff/minify/v2/css"
 )
 
+// RollupCSSHandlerOptions defines configuration options for the handler returned by RollupCSSHandler.
 type RollupCSSHandlerOptions struct {
-	FS    fs.FS
+	// FS is the filesystem from which CSS files are read.
+	FS fs.FS
+	// Paths maps the file name of a rollup file to the ordered list of CSS paths in FS that it combines.
 	Paths map[string][]string
 }
 
+// RollupCSSHandler returns a handler that serves the CSS files listed in 'opts.Paths' for the requested file name,
+// minified and concatenated in order. It responds with a 404 if the file name is not a key in 'opts.Paths'.
 func RollupCSSHandler(opts *RollupCSSHandlerOptions) (http.Handler, error) {
 
 	m := minify.New()

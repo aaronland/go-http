@@ -15,7 +15,7 @@ func init() {
 	RegisterServer(ctx, "lambda", NewLambdaServer)
 }
 
-// LambdaServer implements the `Server` interface for a use in a AWS Lambda + API Gateway context.
+// LambdaServer implements the `Server` interface for use in an AWS Lambda + API Gateway context.
 type LambdaServer struct {
 	Server
 	url          *url.URL
@@ -57,7 +57,7 @@ func (s *LambdaServer) Address() string {
 	return s.url.String()
 }
 
-// ListenAndServe starts the serve and listens for requests using 'mux' for routing.
+// ListenAndServe starts the server and listens for requests using 'mux' for routing.
 func (s *LambdaServer) ListenAndServe(ctx context.Context, mux http.Handler) error {
 
 	lambda_opts := new(algnhsa.Options)

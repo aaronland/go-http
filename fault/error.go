@@ -7,6 +7,6 @@ type FaultError interface {
 	error
 	// Public returns an `error` instance whose string value is considered safe for publishing in a public setting or context.
 	Public() error
-	// Private returns an `error` instance whose string value that may contain details not suitable for publishing in a public setting or context.
+	// Private returns an `error` instance whose string value may contain details not suitable for publishing in a public setting or context.
 	Private() error
 }

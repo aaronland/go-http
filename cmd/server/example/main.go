@@ -1,3 +1,5 @@
+// Command example starts a simple "Hello, {host}" web server using a `server.Server` instance configured
+// by a URI, optionally returning a 503 Service Unavailable response for all requests.
 package main
 
 import (
@@ -11,6 +13,7 @@ import (
 	"github.com/sfomuseum/go-flags/flagset"
 )
 
+// NewHandler returns an `http.Handler` that responds with a greeting containing the request host.
 func NewHandler() http.Handler {
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {

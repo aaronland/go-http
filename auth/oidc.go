@@ -25,10 +25,14 @@ const oidcDefaultSessionTTL = 24 * time.Hour
 
 // OIDCAccount is the `Account` derived from the claims of an OpenID Connect ID token.
 type OIDCAccount struct {
-	Subject      string `json:"sub"`
+	// Subject is the "sub" claim.
+	Subject string `json:"sub"`
+	// EmailAddress is the "email" claim.
 	EmailAddress string `json:"email,omitempty"`
-	ProfileName  string `json:"name,omitempty"`
-	Expires      int64  `json:"exp"`
+	// ProfileName is the "name" claim.
+	ProfileName string `json:"name,omitempty"`
+	// Expires is the "exp" claim as a Unix timestamp.
+	Expires int64 `json:"exp"`
 }
 
 // Id returns the "sub" claim.

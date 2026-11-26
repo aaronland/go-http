@@ -10,12 +10,13 @@ import (
 	"strings"
 )
 
-// RewriteHTMLFunc is custom callback function for altering the HTML content of 'node'
+// RewriteHTMLFunc is a custom callback function for altering the HTML content of 'node'.
 type RewriteHTMLFunc func(node *html.Node, writer io.Writer)
 
-// RewriteHTMLHandler return a `net/http` middleware handle to alter the body of 'previous_handler'
+// RewriteHTMLHandler returns a `net/http` middleware handler to alter the body of 'previous_handler'
 // using 'rewrite_func'. Content is only altered if and when the "Content-Type" header (returned by
-// 'previous_handler') is "text/html". If not the unaltered body is returned as-is.
+// 'previous_handler') is "text/html". If not, the unaltered body is returned as-is. Redirects
+// are passed along as a 303 redirect.
 func RewriteHTMLHandler(previous_handler go_http.Handler, rewrite_func RewriteHTMLFunc) go_http.Handler {
 
 	fn := func(rsp go_http.ResponseWriter, req *go_http.Request) {

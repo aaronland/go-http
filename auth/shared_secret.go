@@ -23,7 +23,7 @@ func init() {
 	RegisterAuthenticator(ctx, "sharedsecret", NewSharedSecretAuthenticator)
 }
 
-// type SharedSecretAuthenticator implements the Authenticator interface to require a simple shared secret be passed
+// SharedSecretAuthenticator implements the Authenticator interface to require a simple shared secret be passed
 // with all requests. This is not a sophisticated handler. There are no nonces or hashing of requests or anything like
 // that. It is a bare-bones supplementary authentication handler for environments that already implement their own
 // measures of access control.
@@ -59,7 +59,8 @@ func NewSharedSecretAuthenticator(ctx context.Context, uri string) (Authenticato
 	return a, nil
 }
 
-// WrapHandler returns
+// WrapHandler returns an `http.Handler` that wraps 'next' and responds with an HTTP "403 Forbidden" error
+// if `GetAccountForRequest` fails for the request.
 func (a *SharedSecretAuthenticator) WrapHandler(next http.Handler) http.Handler {
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {
@@ -78,7 +79,7 @@ func (a *SharedSecretAuthenticator) WrapHandler(next http.Handler) http.Handler 
 	return http.HandlerFunc(fn)
 }
 
-// GetAccountForRequest returns an stub `Account` instance for requests that contain a valid `X-Shared-Secret` HTTP header.
+// GetAccountForRequest returns a stub `Account` instance for requests that contain a valid `X-Shared-Secret` HTTP header.
 func (a *SharedSecretAuthenticator) GetAccountForRequest(req *http.Request) (Account, error) {
 
 	secret := req.Header.Get(SHARED_SECRET_HEADER)
@@ -101,7 +102,7 @@ func (a *SharedSecretAuthenticator) SignoutHandler() http.Handler {
 	return response.NotImplementedHandler()
 }
 
-// SignoutHandler returns an `http.Handler` instance that returns an HTTP "501 Not implemented" error.
+// SignupHandler returns an `http.Handler` instance that returns an HTTP "501 Not implemented" error.
 func (a *SharedSecretAuthenticator) SignupHandler() http.Handler {
 	return response.NotImplementedHandler()
 }

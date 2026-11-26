@@ -1,3 +1,6 @@
+// Package server provides a common interface, and a registry of implementations, for HTTP servers
+// that can be instantiated from a URI. Implementations are included for plain HTTP(S) servers,
+// `mkcert` generated TLS certificates, and AWS Lambda (API Gateway and Function URL) contexts.
 package server
 
 import (
@@ -11,7 +14,7 @@ import (
 	"github.com/aaronland/go-roster"
 )
 
-// type Server is an interface for creating server instances that serve requests using a `http.Handler` router.
+// Server is an interface for creating server instances that serve requests using a `http.Handler` router.
 type Server interface {
 	// ListenAndServe starts the server and listens for requests using a `http.Handler` instance for routing.
 	ListenAndServe(context.Context, http.Handler) error
@@ -19,7 +22,7 @@ type Server interface {
 	Address() string
 }
 
-// ServeritializeFunc is a function used to initialize an implementation of the `Server` interface.
+// ServerInitializeFunc is a function used to initialize an implementation of the `Server` interface.
 type ServerInitializeFunc func(context.Context, string) (Server, error)
 
 var servers roster.Roster
@@ -40,7 +43,7 @@ func ensureServers() error {
 	return nil
 }
 
-// RegisterServer() associates 'scheme' with 'f' in an internal list of avilable `Server` implementations.
+// RegisterServer associates 'scheme' with 'f' in an internal list of available `Server` implementations.
 func RegisterServer(ctx context.Context, scheme string, f ServerInitializeFunc) error {
 
 	err := ensureServers()
@@ -52,8 +55,8 @@ func RegisterServer(ctx context.Context, scheme string, f ServerInitializeFunc) 
 	return servers.Register(ctx, scheme, f)
 }
 
-// NewServer() returns a new instance of `Server` for the scheme associated with 'uri'. It is assumed that this scheme
-// will have previously been "registered" with the `RegisterServer` method.
+// NewServer returns a new instance of `Server` for the scheme associated with 'uri'. It is assumed that this scheme
+// will have previously been "registered" with the `RegisterServer` function.
 func NewServer(ctx context.Context, uri string) (Server, error) {
 
 	err := ensureServers()
@@ -80,7 +83,7 @@ func NewServer(ctx context.Context, uri string) (Server, error) {
 	return f(ctx, uri)
 }
 
-// Schemes() returns the list of schemes that have been "registered".
+// Schemes returns the sorted list of schemes (in the form "scheme://") that have been "registered".
 func Schemes() []string {
 	ctx := context.Background()
 	drivers := servers.Drivers(ctx)

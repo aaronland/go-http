@@ -4,6 +4,8 @@ import (
 	"net/http"
 )
 
+// RequestString returns a sanitised string for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestString(req *http.Request, param string) (string, error) {
 
 	switch req.Method {
@@ -16,6 +18,8 @@ func RequestString(req *http.Request, param string) (string, error) {
 
 }
 
+// RequestInt returns a sanitised int for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestInt(req *http.Request, param string) (int, error) {
 
 	switch req.Method {
@@ -28,6 +32,8 @@ func RequestInt(req *http.Request, param string) (int, error) {
 
 }
 
+// RequestInt64 returns a sanitised int64 for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestInt64(req *http.Request, param string) (int64, error) {
 
 	switch req.Method {
@@ -40,6 +46,8 @@ func RequestInt64(req *http.Request, param string) (int64, error) {
 
 }
 
+// RequestFloat64 returns a sanitised float64 for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestFloat64(req *http.Request, param string) (float64, error) {
 
 	switch req.Method {
@@ -52,6 +60,8 @@ func RequestFloat64(req *http.Request, param string) (float64, error) {
 
 }
 
+// RequestBool returns a sanitised bool for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestBool(req *http.Request, param string) (bool, error) {
 
 	switch req.Method {

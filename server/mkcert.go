@@ -14,6 +14,7 @@ import (
 	"strings"
 )
 
+// MKCERT is the name of the `mkcert` binary.
 const MKCERT string = "mkcert"
 
 func init() {
@@ -21,8 +22,8 @@ func init() {
 	RegisterServer(ctx, "mkcert", NewMkCertServer)
 }
 
-// NewMkCertServer returns a new `HTTPServer` instance configured using 'uri'
-// in the form of:
+// NewMkCertServer returns a new `Server` instance (an HTTPS `HTTPServer`) using a TLS certificate and key
+// created with `mkcert` and configured using 'uri' in the form of:
 //
 //	mkcert://?{PARAMETERS}
 //
@@ -89,7 +90,7 @@ func NewMkCertServer(ctx context.Context, uri string) (Server, error) {
 	return NewServer(ctx, https_uri)
 }
 
-// mkCert creates a new TLS certificate and key using the `mkcert` binary stored in 'root'.
+// mkCert creates a new TLS certificate and key in 'root' for the host in 'u' using the `mkcert` binary.
 func mkCert(u *url.URL, root string) (string, string, error) {
 
 	err := mkCertInstall()

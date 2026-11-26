@@ -31,7 +31,7 @@ func MapConfigHandler(cfg *MapConfig) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
-// AssignMapConfigHandlerOptions defines configuration options for the AssignMapConfigHandler method.
+// AssignMapConfigHandlerOptions defines configuration options for the `AssignMapConfigHandler` and `MapConfigFromOptions` functions.
 type AssignMapConfigHandlerOptions struct {
 	// A string label indicating the map provider to use. Valid options are: leaflet, protomaps.
 	MapProvider string
@@ -49,12 +49,12 @@ type AssignMapConfigHandlerOptions struct {
 	LeafletPanes map[string]int
 	// A valid Protomaps theme label.
 	ProtomapsTheme string
-	// MaxDataZoom is the maximum zoom (tile) level for data in a PMTiles database
+	// ProtomapsMaxDataZoom is the maximum zoom (tile) level for data in a PMTiles database.
 	ProtomapsMaxDataZoom int
 }
 
-// AssignMapConfigHandler derives a new `MapConfig` and corresponding `http.Handler` instance from 'opts' assigning
-// to 'mux' at 'map_cfg_uri'.
+// AssignMapConfigHandler derives a new `MapConfig` and corresponding `http.Handler` instance from 'opts' and assigns it
+// to 'mux' at 'map_cfg_uri'. If the config has a custom tile handler it is also assigned to 'mux' at the config's tile URL.
 func AssignMapConfigHandler(opts *AssignMapConfigHandlerOptions, mux *http.ServeMux, map_cfg_uri string) error {
 
 	map_cfg, err := MapConfigFromOptions(opts)

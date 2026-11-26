@@ -1,3 +1,4 @@
+// Package rewrite provides middleware for rewriting HTTP requests and the HTML content of HTTP responses.
 package rewrite
 
 import (
@@ -10,22 +11,22 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-// AppendResourcesOptions is a struct containing configuration options for the `AppendResourcesHandler` method.
+// AppendResourcesOptions is a struct containing configuration options for the `AppendResourcesHandler` function.
 type AppendResourcesOptions struct {
 	// A list of JavaScript URIs to append to an HTML document's `<head>` element as `<script>` tags.
 	JavaScript []string
 	// A list of CSS URIs to append to an HTML document's `<head>` element as `<link rel="stylesheet">` tags.
 	Stylesheets []string
-	// A dictionary of key and value pairs to append to an HTML document's <body> element as `data-{KEY}="{VALUE}` attributes.
+	// A dictionary of key and value pairs to append to an HTML document's <body> element as `data-{KEY}="{VALUE}"` attributes.
 	DataAttributes map[string]string
 	// AppendJavaScriptAtEOF is a boolean flag to append JavaScript markup at the end of an HTML document
 	// rather than in the <head> HTML element. Default is false
 	AppendJavaScriptAtEOF bool
 }
 
-// AppendResourcesHandler() creates a `RewriteHTMLFunc` callback function, configured by 'opts', and uses that
+// AppendResourcesHandler creates a `RewriteHTMLFunc` callback function, configured by 'opts', and uses that
 // callback function and 'previous_handler' to invoke the `RewriteHTMLHandler` function. All of this will cause
-// the output of 'previous_handler' to be rewritten to append headers and data attributes defined in 'opts'.
+// the output of 'previous_handler' to be rewritten to append the JavaScript, stylesheets and data attributes defined in 'opts'.
 func AppendResourcesHandler(previous_handler http.Handler, opts *AppendResourcesOptions) http.Handler {
 
 	var cb RewriteHTMLFunc

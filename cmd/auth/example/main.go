@@ -1,3 +1,4 @@
+// Command example is a simple HTTP server that demonstrates using an `auth.Authenticator` to protect a handler.
 package main
 
 import (

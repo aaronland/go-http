@@ -8,8 +8,10 @@ import (
 	"strings"
 )
 
+// LEAFLET_OSM_TILE_URL is the URL template for OpenStreetMap's standard raster tile layer.
 const LEAFLET_OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
+// LeafletConfig defines configuration details for maps using Leaflet.
 type LeafletConfig struct {
 	// A `LeafletStyle` instance used to style geometries
 	Style *LeafletStyle `json:"style,omitempty"`
@@ -21,13 +23,19 @@ type LeafletConfig struct {
 	Panes map[string]int `json:"panes,omitempty"`
 }
 
-// LeafletStyle is a struct containing details for decorating GeoJSON features and markers
+// LeafletStyle is a struct containing details for decorating GeoJSON features and markers.
 type LeafletStyle struct {
-	Color       string  `json:"color,omitempty"`
-	FillColor   string  `json:"fillColor,omitempty"`
-	Weight      float64 `json:"weight,omitempty"`
-	Opacity     float64 `json:"opacity,omitempty"`
-	Radius      float64 `json:"radius,omitempty"`
+	// Color is the stroke colour.
+	Color string `json:"color,omitempty"`
+	// FillColor is the fill colour.
+	FillColor string `json:"fillColor,omitempty"`
+	// Weight is the stroke width in pixels.
+	Weight float64 `json:"weight,omitempty"`
+	// Opacity is the stroke opacity.
+	Opacity float64 `json:"opacity,omitempty"`
+	// Radius is the radius of point markers.
+	Radius float64 `json:"radius,omitempty"`
+	// FillOpacity is the fill opacity.
 	FillOpacity float64 `json:"fillOpacity,omitempty"`
 	// Custom flags for runtime style configuration
 	Custom any `json:"custom,omitempty"`
@@ -72,7 +80,7 @@ func UnmarshalStyleFromString(raw string) (*LeafletStyle, error) {
 	return s, nil
 }
 
-// UnmarshalStyleFromString derives a `LeafletStyle` instance from the body of 'r'.
+// UnmarshalStyleFromReader derives a `LeafletStyle` instance from the body of 'r'.
 func UnmarshalStyleFromReader(r io.Reader) (*LeafletStyle, error) {
 
 	var s *LeafletStyle

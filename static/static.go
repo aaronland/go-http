@@ -1,3 +1,5 @@
+// Package static provides handlers for serving static assets from an `fs.FS` instance and for
+// appending references to those assets to HTML output.
 package static
 
 import (
@@ -9,12 +11,14 @@ import (
 	"github.com/aaronland/go-http/v4/rewrite"
 )
 
+// StaticAssetsHandler returns an `http.Handler` that serves the files in 'static_fs'.
 func StaticAssetsHandler(static_fs fs.FS) (http.Handler, error) {
 
 	http_fs := http.FS(static_fs)
 	return http.FileServer(http_fs), nil
 }
 
+// StaticAssetsHandlerWithPrefix returns an `http.Handler` that serves the files in 'static_fs' after removing 'prefix' from the request path.
 func StaticAssetsHandlerWithPrefix(static_fs fs.FS, prefix string) (http.Handler, error) {
 
 	fs_handler, err := StaticAssetsHandler(static_fs)
@@ -38,10 +42,12 @@ func StaticAssetsHandlerWithPrefix(static_fs fs.FS, prefix string) (http.Handler
 	return rewrite_handler, nil
 }
 
+// AppendStaticAssetHandlers registers a handler on 'mux' for each file in 'static_fs'.
 func AppendStaticAssetHandlers(mux *http.ServeMux, static_fs fs.FS) error {
 	return AppendStaticAssetHandlersWithPrefix(mux, static_fs, "")
 }
 
+// AppendStaticAssetHandlersWithPrefix registers a handler on 'mux' for each file in 'static_fs', with 'prefix' prepended to the path of each file.
 func AppendStaticAssetHandlersWithPrefix(mux *http.ServeMux, static_fs fs.FS, prefix string) error {
 
 	asset_handler, err := StaticAssetsHandlerWithPrefix(static_fs, prefix)

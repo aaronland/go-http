@@ -1,3 +1,4 @@
+// Command encrypted-cookie prints a new URI suitable for instantiating an `EncryptedCookie` instance.
 package main
 
 import (

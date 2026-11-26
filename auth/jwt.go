@@ -14,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// AUTHORIZATION_HEADER is the default name of the HTTP header that is checked for a bearer JWT.
 const AUTHORIZATION_HEADER string = "Authentication"
 
 var re_auth = regexp.MustCompile(`Bearer\s+((?:[_\-A-Za-z0-9+/]*={0,3})\.(?:[_\-A-Za-z0-9+/]*={0,3})\.([_\-A-Za-z0-9+/]*={0,3}))$`)
@@ -23,16 +24,16 @@ func init() {
 	RegisterAuthenticator(ctx, "jwt", NewJWTAuthenticator)
 }
 
-// type JWTAuthenticatorClaims are the custom claims for Authorization requests.
+// JWTAuthenticatorClaims are the custom claims for Authorization requests.
 type JWTAuthenticatorClaims struct {
-	// The unique ID associated with this account.
+	// AccountId is the unique ID associated with this account.
 	AccountId string `json:"account_id"`
-	// The name associated with this account.
+	// AccountName is the name associated with this account.
 	AccountName string `json:"account_name"`
 	jwt.RegisteredClaims
 }
 
-// type JWTAuthenticator implements the Authenticator interface to require a valid JSON Web Token (JWT) be passed
+// JWTAuthenticator implements the Authenticator interface to require a valid JSON Web Token (JWT) be passed
 // with all requests.
 type JWTAuthenticator struct {
 	Authenticator
@@ -50,9 +51,9 @@ type JWTAuthenticator struct {
 //	jwt://runtimevar?runtimevar-uri={GOCLOUD_DEV_RUNTIMEVAR_URI}
 //
 // Where {GOCLOUD_DEV_RUNTIMEVAR_URI} is a valid `gocloud.dev/runtimevar` URI used to dereference the JWT signing secret.
-// Under the hood this method using the `github.com/sfomuseum/runtimevar.StringVar` method to dereference runtimevar URIs.
+// Under the hood this method uses the `github.com/sfomuseum/runtimevar.StringVar` method to dereference runtimevar URIs.
 //
-// By default a `JWTAuthenticator` instance looks for JWT Bearer tokens in the HTTP "Authorization" header. This behaviour
+// By default a `JWTAuthenticator` instance looks for JWT Bearer tokens in the HTTP "Authentication" header. This behaviour
 // can be customized by passing an "authorization-header" query parameter in 'uri'. For example:
 //
 //	jwt://?authorization-header=X-Custom-AuthHeader
@@ -99,7 +100,8 @@ func NewJWTAuthenticator(ctx context.Context, uri string) (Authenticator, error)
 	return a, nil
 }
 
-// WrapHandler returns
+// WrapHandler returns an `http.Handler` that wraps 'next' and responds with an HTTP "403 Forbidden" error
+// if `GetAccountForRequest` fails for the request.
 func (a *JWTAuthenticator) WrapHandler(next http.Handler) http.Handler {
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {
@@ -119,7 +121,7 @@ func (a *JWTAuthenticator) WrapHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
-// GetAccountForRequest returns an stub `Account` instance for requests that contain a valid `Authorization: Bearer {JWT_TOKEN}` HTTP header (or a custom header if defined in the `JWTAuthenticator` constuctor URI).
+// GetAccountForRequest returns a stub `Account` instance for requests that contain a valid `Authorization: Bearer {JWT_TOKEN}` HTTP header (or a custom header if defined in the `JWTAuthenticator` constructor URI).
 func (a *JWTAuthenticator) GetAccountForRequest(req *http.Request) (Account, error) {
 
 	var acct Account
@@ -177,7 +179,7 @@ func (a *JWTAuthenticator) SignoutHandler() http.Handler {
 	return response.NotImplementedHandler()
 }
 
-// SignoutHandler returns an `http.Handler` instance that returns an HTTP "501 Not implemented" error.
+// SignupHandler returns an `http.Handler` instance that returns an HTTP "501 Not implemented" error.
 func (a *JWTAuthenticator) SignupHandler() http.Handler {
 	return response.NotImplementedHandler()
 }

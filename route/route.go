@@ -1,3 +1,5 @@
+// Package route provides an `http.Handler` that routes requests using `http.ServeMux` style patterns
+// but defers initializing the handlers being routed to until they are needed.
 package route
 
 import (
@@ -20,7 +22,7 @@ var re_route = regexp.MustCompile(`^(?:(?:(GET|POST|PUT|HEAD|OPTION|DELETE)\s)?(
 
 var re_mutex = new(sync.RWMutex)
 
-// Regular expression to replace "{label}" style strings with "([^\/]+)".
+// not_a_slash returns the regular expression "([^\/]+)" used to replace "{label}" style strings in URL patterns.
 func not_a_slash(s string) string {
 	return fmt.Sprintf(`([^\/]+)`)
 }
@@ -44,14 +46,14 @@ func (pv *pathValue) String() string {
 type RouteHandlerFunc func(context.Context) (http.Handler, error)
 
 // RouteHandlerOptions is a struct that contains configuration settings
-// for use the RouteHandlerWithOptions method.
+// for use with the RouteHandlerWithOptions function.
 type RouteHandlerOptions struct {
-	// Handlers is a map whose keys are `http.ServeMux` style routing patterns and whose keys
+	// Handlers is a map whose keys are `http.ServeMux` style routing patterns and whose values
 	// are functions that when invoked return `http.Handler` instances.
 	Handlers map[string]RouteHandlerFunc
 }
 
-// RouteHandler create a new `http.Handler` instance that will serve requests using handlers defined in 'handlers'.
+// RouteHandler creates a new `http.Handler` instance that will serve requests using handlers defined in 'handlers'.
 func RouteHandler(handlers map[string]RouteHandlerFunc) (http.Handler, error) {
 
 	opts := &RouteHandlerOptions{
@@ -61,11 +63,10 @@ func RouteHandler(handlers map[string]RouteHandlerFunc) (http.Handler, error) {
 	return RouteHandlerWithOptions(opts)
 }
 
-// RouteHandlerWithOptions create a new `http.Handler` instance that will serve requests using handlers defined
-// in 'opts.Handlers'. This is essentially a "middleware" handler than does all the same routing that the default
-// `http.ServeMux` handler does but defers initiating the handlers being routed to until they invoked at runtime.
-// Only one handler is initialized (or retrieved from an in-memory cache) and served for any given path being by
-// a `RouteHandler` request.
+// RouteHandlerWithOptions creates a new `http.Handler` instance that will serve requests using handlers defined
+// in 'opts.Handlers'. This is essentially a "middleware" handler that does all the same routing that the default
+// `http.ServeMux` handler does but defers initiating the handlers being routed to until they are invoked at runtime.
+// Only one handler is initialized (or retrieved from an in-memory cache) and served for any given request path.
 //
 // The reason this handler exists is for web applications that:
 //

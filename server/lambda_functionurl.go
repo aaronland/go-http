@@ -21,7 +21,7 @@ func init() {
 	RegisterServer(ctx, "functionurl", NewLambdaFunctionURLServer)
 }
 
-// LambdaFunctionURLServer implements the `Server` interface for a use in a AWS LambdaFunctionURL + API Gateway context.
+// LambdaFunctionURLServer implements the `Server` interface for use in an AWS Lambda Function URL context.
 type LambdaFunctionURLServer struct {
 	Server
 	handler            http.Handler
@@ -58,12 +58,12 @@ func NewLambdaFunctionURLServer(ctx context.Context, uri string) (Server, error)
 	return &server, nil
 }
 
-// Address returns the fully-qualified URL used to instantiate 's'.
+// Address returns the URI scheme ("functionurl://") for 's'.
 func (s *LambdaFunctionURLServer) Address() string {
 	return "functionurl://"
 }
 
-// ListenAndServe starts the serve and listens for requests using 'mux' for routing.
+// ListenAndServe starts the server and listens for requests using 'mux' for routing.
 func (s *LambdaFunctionURLServer) ListenAndServe(ctx context.Context, mux http.Handler) error {
 	s.handler = mux
 	lambda.Start(s.handleRequest)

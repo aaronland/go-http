@@ -25,7 +25,7 @@ func init() {
 	RegisterCrumb(ctx, "encrypted", NewEncryptedCrumb)
 }
 
-// type EncryptedCrumb implements the Crumb interface for crumb strings that are encrypted.
+// EncryptedCrumb implements the Crumb interface for crumb strings that are encrypted.
 type EncryptedCrumb struct {
 	Crumb
 	extra     string
@@ -35,7 +35,7 @@ type EncryptedCrumb struct {
 	key       string
 }
 
-// NewRandomEncryptedCrumbSecret returns a random salt value suitable for `encrypted://` crumb URIs.
+// NewRandomEncryptedCrumbSecret returns a random secret value suitable for `encrypted://` crumb URIs.
 func NewRandomEncryptedCrumbSecret() (string, error) {
 
 	r_opts := random.DefaultOptions()
@@ -66,7 +66,7 @@ func NewRandomEncryptedCrumbExtra() (string, error) {
 	return extra, nil
 }
 
-// NewRandomEncryptedCrumbURI return a valid `aaronland/go-http-crumb` URI for an encrypted crumb
+// NewRandomEncryptedCrumbURI returns a valid `aaronland/go-http-crumb` URI for an encrypted crumb
 // whose key is 'key' and whose time to live is 'ttl'.
 func NewRandomEncryptedCrumbURI(ctx context.Context, ttl int, key string) (string, error) {
 
@@ -93,7 +93,8 @@ func NewRandomEncryptedCrumbURI(ctx context.Context, ttl int, key string) (strin
 	return uri, nil
 }
 
-// NewEncryptedCrumb returns a new `Crumb` instance for 'uri'.
+// NewEncryptedCrumb returns a new `Crumb` instance for 'uri' which is expected to contain the "extra", "separator",
+// "secret" and "ttl" query parameters and, optionally, "key".
 func NewEncryptedCrumb(ctx context.Context, uri string) (Crumb, error) {
 
 	u, err := url.Parse(uri)
@@ -183,7 +184,7 @@ func (cr *EncryptedCrumb) Generate(req *http.Request, extra ...string) (string, 
 	return enc_var, nil
 }
 
-// Validates return trues or false if 'enc_var' is a valid crumb for 'req'.
+// Validate returns true if 'enc_var' is a valid (and unexpired) crumb for 'req' and an error otherwise.
 func (cr *EncryptedCrumb) Validate(req *http.Request, enc_var string, extra ...string) (bool, error) {
 
 	crumb_var, err := cr.decryptCrumb(enc_var)

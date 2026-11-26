@@ -12,13 +12,13 @@ type StatusWriter struct {
 	Status int
 }
 
-// New shows setup for a middleware function. This could be a logging
-// function or similar whereby you require access to the status code from
-// `http.ResponseWriter`
+// NewStatusWriter returns a new `StatusWriter` wrapping 'w'. It is intended for middleware
+// (such as a logging function) that requires access to the status code written to
+// `http.ResponseWriter`. The default status is `http.StatusOK`.
 //
 //			func MyMiddleware(h http.HandleFunc) http.HandlerFunc {
 //					return func(w http.ResponseWriter, r *http.Request) {
-//	       			sw := status_writer.New(w) // Here we override http.ResponseWriter's `WriteHeader` function
+//	       			sw := fault.NewStatusWriter(w) // Here we override http.ResponseWriter's `WriteHeader` function
 //						h(sw, r)
 //	       			statusCode := sw.Status // Now work with the status code
 //	   			}
@@ -30,7 +30,7 @@ func NewStatusWriter(w http.ResponseWriter) *StatusWriter {
 	}
 }
 
-// WriteHeader override the http.ResponseWriter's `WriteHeader` method
+// WriteHeader records 'status' and then calls the underlying `http.ResponseWriter`'s `WriteHeader` method.
 func (w *StatusWriter) WriteHeader(status int) {
 	w.Status = status
 	w.ResponseWriter.WriteHeader(status)

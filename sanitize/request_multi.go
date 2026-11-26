@@ -4,6 +4,8 @@ import (
 	"net/http"
 )
 
+// RequestStringMulti returns sanitised strings for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestStringMulti(req *http.Request, param string) ([]string, error) {
 
 	switch req.Method {
@@ -16,6 +18,8 @@ func RequestStringMulti(req *http.Request, param string) ([]string, error) {
 
 }
 
+// RequestIntMulti returns sanitised ints for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestIntMulti(req *http.Request, param string) ([]int, error) {
 
 	switch req.Method {
@@ -28,6 +32,8 @@ func RequestIntMulti(req *http.Request, param string) ([]int, error) {
 
 }
 
+// RequestInt64Multi returns sanitised int64 values for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestInt64Multi(req *http.Request, param string) ([]int64, error) {
 
 	switch req.Method {
@@ -40,6 +46,8 @@ func RequestInt64Multi(req *http.Request, param string) ([]int64, error) {
 
 }
 
+// RequestFloat64Multi returns sanitised float64 values for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestFloat64Multi(req *http.Request, param string) ([]float64, error) {
 
 	switch req.Method {
@@ -52,6 +60,8 @@ func RequestFloat64Multi(req *http.Request, param string) ([]float64, error) {
 
 }
 
+// RequestBoolMulti returns sanitised bool values for 'param' from the POST form body if the request method is POST,
+// otherwise from the URL query parameters.
 func RequestBoolMulti(req *http.Request, param string) ([]bool, error) {
 
 	switch req.Method {

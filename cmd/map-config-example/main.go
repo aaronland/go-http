@@ -1,3 +1,5 @@
+// Command map-config-example is an example web server that serves a map configuration
+// (at /map.json) and an embedded web application for displaying a map using that configuration.
 package main
 
 import (

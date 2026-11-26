@@ -25,7 +25,7 @@ type EncryptedCookie struct {
 	salt   string
 }
 
-// NewRandomEncryptedCookieSecret returns a random salt value suitable for `encrypted://` cookie URIs.
+// NewRandomEncryptedCookieSecret returns a random secret value suitable for `encrypted://` cookie URIs.
 func NewRandomEncryptedCookieSecret() (string, error) {
 
 	r_opts := random.DefaultOptions()
@@ -55,7 +55,7 @@ func NewRandomEncryptedCookieSalt() (string, error) {
 	return salt, nil
 }
 
-// NewRandomEncryptedCookieURI() returns a new URI for creating an `EncryptedCookie` instance for 'name' with random values for the required secret and salt.
+// NewRandomEncryptedCookieURI returns a new URI for creating an `EncryptedCookie` instance for 'name' with random values for the required secret and salt.
 func NewRandomEncryptedCookieURI(name string) (string, error) {
 
 	secret, err := NewRandomEncryptedCookieSecret()
@@ -74,9 +74,9 @@ func NewRandomEncryptedCookieURI(name string) (string, error) {
 	return cookie_uri, nil
 }
 
-// NewEncryptedCookie() returns a new `EncryptedCookie` instance derived from 'uri' which is expected to take the form of:
+// NewEncryptedCookie returns a new `EncryptedCookie` instance derived from 'uri' which is expected to take the form of:
 //
-//	encrypted://?name={NAME}&secret={SECRET}&salt={SECRET}
+//	encrypted://?name={NAME}&secret={SECRET}&salt={SALT}
 //
 // Where `{NAME}` is the name of the cookie for all subsequent operations; `{SECRET}` is the secret key used to encrypt the value of the cookie; `{SALT}` is the salt used to encrypt the cookie.
 func NewEncryptedCookie(ctx context.Context, uri string) (Cookie, error) {
@@ -130,7 +130,7 @@ func (c *EncryptedCookie) GetString(req *http.Request) (string, error) {
 	return buf.String(), nil
 }
 
-// GetString returns the value of the cookie associated with 'c' in 'req' as an unencrypted `memguard.LockedBuffer` instance.
+// Get returns the value of the cookie associated with 'c' in 'req' as an unencrypted `memguard.LockedBuffer` instance.
 func (c *EncryptedCookie) Get(req *http.Request) (*memguard.LockedBuffer, error) {
 
 	http_cookie, err := req.Cookie(c.name)

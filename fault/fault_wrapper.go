@@ -14,7 +14,7 @@ type FaultWrapper struct {
 	template *template.Template
 }
 
-// NewFaultWrapper will create a new `FaultWrapper` instance.
+// NewFaultWrapper creates a new `FaultWrapper` instance.
 func NewFaultWrapper(logger *log.Logger, template *template.Template) *FaultWrapper {
 
 	fw := &FaultWrapper{
@@ -32,7 +32,7 @@ func (fw *FaultWrapper) HandleWithMux(mux *http.ServeMux, uri string, h http.Han
 }
 
 // TemplatedFaultHandlerWrapper will return a middleware `http.Handler` that when invoked will serve 'h'
-// and if the response status code is >= `http.StatusBadRequest` (300) will serve a new fault handler
+// and if the response status code is >= `http.StatusBadRequest` (400) will serve a new fault handler
 // using 't' and 'l'.
 func TemplatedFaultHandlerWrapper(l *log.Logger, t *template.Template, h http.Handler) http.Handler {
 

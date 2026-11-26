@@ -1,3 +1,5 @@
+// Command fileserver serves files from a local directory over HTTP, with optional CORS, gzip,
+// custom content type and custom response header support.
 package main
 
 import (

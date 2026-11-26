@@ -12,8 +12,8 @@ func init() {
 	RegisterCrumb(ctx, "debug", NewDebugCrumb)
 }
 
-// NewDebugCrumb returns a `EncryptedCrumb` instance with a randomly generated secret and salt valid
-// for 5 minutes configured by 'uri' which should take the form of:
+// NewDebugCrumb returns an `EncryptedCrumb` instance with a randomly generated secret and extra value valid
+// for 5 minutes (by default) configured by 'uri' which should take the form of:
 //
 //	debug://?{QUERY_PARAMETERS}
 //

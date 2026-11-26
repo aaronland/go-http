@@ -1,3 +1,5 @@
+// Package auth provides a common interface for enforcing authentication in HTTP handlers, along with
+// several implementations (JWT, OpenID Connect, shared secret, null and none).
 package auth
 
 import (
@@ -11,11 +13,11 @@ import (
 	"github.com/aaronland/go-roster"
 )
 
-// type Authenticator is a simple interface for	enforcing authentication in HTTP handlers.
+// Authenticator is a simple interface for enforcing authentication in HTTP handlers.
 type Authenticator interface {
 	// WrapHandler wraps a `http.Handler` with any implementation-specific middleware.
 	WrapHandler(http.Handler) http.Handler
-	// GetAccountForRequest returns an `Account` instance  for an HTTP request.
+	// GetAccountForRequest returns an `Account` instance for an HTTP request.
 	GetAccountForRequest(*http.Request) (Account, error)
 	// SigninHandler returns a `http.Handler` for implementing account signin.
 	SigninHandler() http.Handler
@@ -27,10 +29,11 @@ type Authenticator interface {
 
 var authenticator_roster roster.Roster
 
-// AuthenticatorInitializationFunc is a function defined by individual authenticator package and used to create
-// an instance of that authenticator
+// AuthenticatorInitializationFunc is a function defined by individual authenticator packages and used to create
+// an instance of that authenticator.
 type AuthenticatorInitializationFunc func(ctx context.Context, uri string) (Authenticator, error)
 
+// MustRegisterAuthenticator calls `RegisterAuthenticator` and panics if registration fails.
 func MustRegisterAuthenticator(ctx context.Context, scheme string, init_func AuthenticatorInitializationFunc) {
 
 	err := RegisterAuthenticator(ctx, scheme, init_func)

@@ -1,3 +1,5 @@
+// Package bootstrap provides middleware and HTTP handlers for serving embedded Bootstrap assets
+// and appending references to them to HTML output.
 package bootstrap
 
 import (
@@ -12,7 +14,7 @@ import (
 	aa_static "github.com/aaronland/go-http/v4/static"
 )
 
-// BootstrapOptions provides a list of JavaScript and CSS link to include with HTML output.
+// BootstrapOptions provides a list of JavaScript and CSS links to include with HTML output.
 type BootstrapOptions struct {
 	// A list of relative Bootstrap Javascript URLs to append as resources in HTML output.
 	JS []string
@@ -21,11 +23,13 @@ type BootstrapOptions struct {
 	// AppendJavaScriptAtEOF is a boolean flag to append JavaScript markup at the end of an HTML document
 	// rather than in the <head> HTML element. Default is false
 	AppendJavaScriptAtEOF bool
-	RollupAssets          bool
-	Prefix                string
+	// RollupAssets is a boolean flag to serve multiple JS and CSS assets as single minified "rollup" files.
+	RollupAssets bool
+	// Prefix is an optional URL path prefix to prepend to all asset URLs.
+	Prefix string
 }
 
-// Return a *BootstrapOptions struct with default paths and URIs.
+// DefaultBootstrapOptions returns a *BootstrapOptions struct with default paths and URIs.
 func DefaultBootstrapOptions() *BootstrapOptions {
 
 	opts := &BootstrapOptions{
@@ -36,6 +40,7 @@ func DefaultBootstrapOptions() *BootstrapOptions {
 	return opts
 }
 
+// EnableJavascript appends the Bootstrap JavaScript bundle to the list of JavaScript URLs in 'opts'.
 func (opts *BootstrapOptions) EnableJavascript() {
 	opts.JS = append(opts.JS, "/javascript/bootstrap.bundle.min.js")
 }
@@ -70,7 +75,8 @@ func AppendResourcesHandler(next http.Handler, opts *BootstrapOptions) http.Hand
 	return aa_static.AppendResourcesHandlerWithPrefix(next, static_opts, opts.Prefix)
 }
 
-// Append all the files in the net/http FS instance containing the embedded Bootstrap assets to an *http.ServeMux instance.
+// AppendAssetHandlers appends handlers for the embedded Bootstrap assets to 'mux'. If 'opts.RollupAssets'
+// is true multiple JavaScript or CSS assets are served as a single minified rollup file.
 func AppendAssetHandlers(mux *http.ServeMux, opts *BootstrapOptions) error {
 
 	if !opts.RollupAssets {

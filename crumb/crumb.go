@@ -1,3 +1,5 @@
+// Package crumb provides interfaces and implementations for generating and validating HTTP crumbs
+// (CSRF tokens), along with middleware for assigning and checking them in HTTP handlers.
 package crumb
 
 import (
@@ -11,11 +13,11 @@ import (
 	"github.com/aaronland/go-roster"
 )
 
-// type Crumb is an interface for generating and validating HTTP crumb strings.
+// Crumb is an interface for generating and validating HTTP crumb strings.
 type Crumb interface {
-	// Generate return a new crumb string for an HTTP request.
+	// Generate returns a new crumb string for an HTTP request.
 	Generate(*http.Request, ...string) (string, error)
-	// Generate validates a crumb string for an HTTP request.
+	// Validate validates a crumb string for an HTTP request.
 	Validate(*http.Request, string, ...string) (bool, error)
 	// Key returns the unique key used to generate a crumb.
 	Key(*http.Request) string
@@ -23,7 +25,7 @@ type Crumb interface {
 	Base(*http.Request, ...string) (string, error)
 }
 
-// type CrumbInitializeFunc is a function used to initialize packages that implement the `Crumb` interface.
+// CrumbInitializeFunc is a function used to initialize packages that implement the `Crumb` interface.
 type CrumbInitializeFunc func(context.Context, string) (Crumb, error)
 
 var crumbs roster.Roster
@@ -56,7 +58,8 @@ func RegisterCrumb(ctx context.Context, scheme string, f CrumbInitializeFunc) er
 	return crumbs.Register(ctx, scheme, f)
 }
 
-// Returns a new `Crumb` instance for 'uri'.
+// NewCrumb returns a new `Crumb` instance for 'uri'. It is assumed that the scheme of 'uri' has been registered
+// using the `RegisterCrumb` method.
 func NewCrumb(ctx context.Context, uri string) (Crumb, error) {
 
 	err := ensureCrumbs()

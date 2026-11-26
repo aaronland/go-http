@@ -5,7 +5,7 @@ import (
 )
 
 // EnsureAccountHandler is a middleware `net/http` handler that wraps 'next' and ensures that the
-// authenticator.GetAccountForRequest method does not return an error.
+// authenticator.GetAccountForRequest method does not return an error. If it does, an HTTP "500 Internal Server Error" is returned.
 func EnsureAccountHandler(authenticator Authenticator, next go_http.Handler) go_http.Handler {
 
 	fn := func(rsp go_http.ResponseWriter, req *go_http.Request) {

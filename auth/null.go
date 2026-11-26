@@ -13,12 +13,12 @@ func init() {
 	RegisterAuthenticator(ctx, "null", NewNullAuthenticator)
 }
 
-// type NullAuthenticator implements the Authenticator interface such that no authentication is performed.
+// NullAuthenticator implements the Authenticator interface such that no authentication is performed.
 type NullAuthenticator struct {
 	Authenticator
 }
 
-// NewNullAuthenticator implements the Authenticator interface such that no authentication is performed
+// NewNullAuthenticator returns a new `NullAuthenticator` that performs no authentication. It is
 // configured by 'uri' which is expected to take the form of:
 //
 //	null://
@@ -32,7 +32,7 @@ func (a *NullAuthenticator) WrapHandler(h http.Handler) http.Handler {
 	return h
 }
 
-// GetAccountForRequest returns an stub `Account` instance.
+// GetAccountForRequest returns a stub `Account` instance.
 func (a *NullAuthenticator) GetAccountForRequest(req *http.Request) (Account, error) {
 
 	acct := NewAccount("", "Null")
@@ -49,7 +49,7 @@ func (a *NullAuthenticator) SignoutHandler() http.Handler {
 	return response.NotImplementedHandler()
 }
 
-// SignoutHandler returns an `http.Handler` instance that returns an HTTP "501 Not implemented" error.
+// SignupHandler returns an `http.Handler` instance that returns an HTTP "501 Not implemented" error.
 func (a *NullAuthenticator) SignupHandler() http.Handler {
 	return response.NotImplementedHandler()
 }

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 )
 
+// PROTOMAPS_API_TILE_URL is the URL template for the Protomaps hosted tiles API, where "{key}" is replaced by an API key.
 const PROTOMAPS_API_TILE_URL = "https://api.protomaps.com/tiles/v3/{z}/{x}/{y}.mvt?key={key}"
 
 // ProtomapsConfig defines configuration details for maps using Protomaps.
@@ -14,16 +15,17 @@ type ProtomapsConfig struct {
 	Theme string `json:"theme"`
 	// MaxDataZoom is the maximum zoom (tile) level for data in a PMTiles database
 	MaxDataZoom int `json:"max_data_zoom,omitempty"`
-	//
+	// PaintRules are optional custom Protomaps paint rules.
 	PaintRules []map[string]any `json:"paintRules"`
-	//
+	// LabelRules are optional custom Protomaps label rules.
 	LabelRules []map[string]any `json:"labelRules"`
 }
 
-// ProtomapsFileHandlerFromPath will take a path and create a http.FileServer handler
+// ProtomapsFileHandlerFromPath takes a path and creates a http.FileServer handler
 // instance for the files in its root directory. The handler is returned with
 // a relative URI for the filename in 'path' to be assigned to a net/http
-// ServeMux instance.
+// ServeMux instance. If 'prefix' is not empty it is stripped from request paths
+// and prepended to the returned URI.
 func ProtomapsFileHandlerFromPath(path string, prefix string) (string, http.Handler, error) {
 
 	abs_path, err := filepath.Abs(path)

@@ -11,21 +11,32 @@ import (
 	"github.com/senseyeio/duration"
 )
 
-// https://github.com/golang/go/issues/25194
-
+// Config defines the properties used to create new `http.Cookie` instances.
+//
+// See also: https://github.com/golang/go/issues/25194
 type Config struct {
-	uri      string
-	Name     string
-	Domain   string
-	Path     string
-	Secure   bool
+	uri string
+	// Name is the name of the cookie.
+	Name string
+	// Domain is the cookie's domain.
+	Domain string
+	// Path is the cookie's path.
+	Path string
+	// Secure indicates whether the cookie has the "Secure" attribute set.
+	Secure bool
+	// SameSite is the cookie's "SameSite" mode.
 	SameSite http.SameSite
-	TTL      *duration.Duration
+	// TTL is the optional lifetime of the cookie, used to derive its expiry time.
+	TTL *duration.Duration
 }
 
-// https://example.com/?name=test&ttl=PT1H&samesite=strict
-// test=testing; Path=/; Domain=example.com; Expires=Sat, 03 Oct 2020 18:29:10 GMT; Secure; SameSite=Strict
-
+// NewConfig returns a new `Config` derived from 'uri', which is expected to take the form of:
+//
+//	https://example.com/?name=test&ttl=PT1H&samesite=strict
+//
+// The "name" parameter is required. The optional "ttl" parameter is an ISO 8601 duration and "samesite" may be one of
+// "lax", "strict", "none" or "default". The "Secure" flag is set if the scheme is "https" and the host and path (if present)
+// are used as the cookie's domain and path.
 func NewConfig(ctx context.Context, uri string) (*Config, error) {
 
 	u, err := url.Parse(uri)
@@ -94,6 +105,7 @@ func NewConfig(ctx context.Context, uri string) (*Config, error) {
 	return cfg, nil
 }
 
+// NewCookie returns a new `http.Cookie` with 'value' and the properties defined in 'cfg'.
 func (cfg *Config) NewCookie(ctx context.Context, value string) (*http.Cookie, error) {
 
 	ck := &http.Cookie{

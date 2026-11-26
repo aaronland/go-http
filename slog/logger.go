@@ -1,3 +1,4 @@
+// Package slog provides helpers for deriving `log/slog` loggers decorated with details of HTTP requests.
 package slog
 
 import (

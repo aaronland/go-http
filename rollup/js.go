@@ -12,11 +12,16 @@ import (
 	"github.com/tdewolff/minify/v2/js"
 )
 
+// RollupJSHandlerOptions defines configuration options for the handler returned by RollupJSHandler.
 type RollupJSHandlerOptions struct {
-	FS    fs.FS
+	// FS is the filesystem from which JavaScript files are read.
+	FS fs.FS
+	// Paths maps the file name of a rollup file to the ordered list of JavaScript paths in FS that it combines.
 	Paths map[string][]string
 }
 
+// RollupJSHandler returns a handler that serves the JavaScript files listed in 'opts.Paths' for the requested file name,
+// minified and concatenated in order. It responds with a 404 if the file name is not a key in 'opts.Paths'.
 func RollupJSHandler(opts *RollupJSHandlerOptions) (http.Handler, error) {
 
 	js_regexp, err := regexp.Compile("^(application|text)/(x-)?(java|ecma)script$")

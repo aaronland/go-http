@@ -1,3 +1,4 @@
+// Package maps provides configuration types and HTTP handlers for web maps using Leaflet and Protomaps.
 package maps
 
 import (
@@ -5,14 +6,18 @@ import (
 	"net/http"
 )
 
+// InitialView is the initial (longitude, latitude) centre point of a map.
 type InitialView [2]float64
 
+// String returns the view as a comma-separated "lon,lat" string.
 func (v *InitialView) String() string {
 	return fmt.Sprintf("%f,%f", v[0], v[1])
 }
 
+// InitialBounds is the initial (minx, miny, maxx, maxy) bounding box of a map.
 type InitialBounds [4]float64
 
+// String returns the bounds as a comma-separated "minx,miny,maxx,maxy" string.
 func (v *InitialBounds) String() string {
 	return fmt.Sprintf("%f,%f,%f,%f", v[0], v[1], v[2], v[3])
 }

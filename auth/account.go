@@ -1,10 +1,10 @@
 package auth
 
-// type Account is an interface that defines minimal information for an account.
+// Account is an interface that defines minimal information for an account.
 type Account interface {
-	// The unique ID associated with this account.
+	// Id returns the unique ID associated with this account.
 	Id() string
-	// The name associated with this account.
+	// Name returns the name associated with this account.
 	Name() string
 }
 
@@ -26,12 +26,12 @@ type BasicAccount struct {
 	AccountName string `json:"name"`
 }
 
-// Returns the unique ID associated with 'a'.
+// Id returns the unique ID associated with 'a'.
 func (a *BasicAccount) Id() string {
 	return a.AccountId
 }
 
-// Returns the name associated with 'a'.
+// Name returns the name associated with 'a'.
 func (a *BasicAccount) Name() string {
 	return a.AccountName
 }
