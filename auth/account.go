@@ -3,13 +3,13 @@ package auth
 // type Account is an interface that defines minimal information for an account.
 type Account interface {
 	// The unique ID associated with this account.
-	Id() int64
+	Id() string
 	// The name associated with this account.
 	Name() string
 }
 
 // NewAccount returns a new instance of `BasicAccount` (which implements the `Account` interface) for 'id' and 'name'.
-func NewAccount(id int64, name string) Account {
+func NewAccount(id string, name string) Account {
 
 	return &BasicAccount{
 		AccountId:   id,
@@ -21,13 +21,13 @@ func NewAccount(id int64, name string) Account {
 type BasicAccount struct {
 	Account `json:",omitempty"`
 	// The unique ID associated with this account.
-	AccountId int64 `json:"id"`
+	AccountId string `json:"id"`
 	// The name associated with this account.
 	AccountName string `json:"name"`
 }
 
 // Returns the unique ID associated with 'a'.
-func (a *BasicAccount) Id() int64 {
+func (a *BasicAccount) Id() string {
 	return a.AccountId
 }
 

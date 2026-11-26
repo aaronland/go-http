@@ -13,7 +13,7 @@ import (
 const SHARED_SECRET_HEADER string = "X-Shared-Secret"
 
 // SHARED_SECRET_ACCOUNT_ID is the account ID used for `Account` instances when shared secret authentication validates.
-const SHARED_SECRET_ACCOUNT_ID int64 = -1
+const SHARED_SECRET_ACCOUNT_ID string = ""
 
 // SHARED_SECRET_ACCOUNT_NAME is the account name used for `Account` instances when shared secret authentication validates.
 const SHARED_SECRET_ACCOUNT_NAME string = "sharedsecret"

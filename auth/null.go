@@ -35,7 +35,7 @@ func (a *NullAuthenticator) WrapHandler(h http.Handler) http.Handler {
 // GetAccountForRequest returns an stub `Account` instance.
 func (a *NullAuthenticator) GetAccountForRequest(req *http.Request) (Account, error) {
 
-	acct := NewAccount(0, "Null")
+	acct := NewAccount("", "Null")
 	return acct, nil
 }
 

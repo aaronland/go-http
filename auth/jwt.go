@@ -26,7 +26,7 @@ func init() {
 // type JWTAuthenticatorClaims are the custom claims for Authorization requests.
 type JWTAuthenticatorClaims struct {
 	// The unique ID associated with this account.
-	AccountId int64 `json:"account_id"`
+	AccountId string `json:"account_id"`
 	// The name associated with this account.
 	AccountName string `json:"account_name"`
 	jwt.RegisteredClaims
@@ -156,7 +156,7 @@ func (a *JWTAuthenticator) GetAccountForRequest(req *http.Request) (Account, err
 		return nil, fmt.Errorf("Unknown claims type, cannot proceed")
 	}
 
-	if acct.Id() == 0 {
+	if acct.Id() == "" {
 		return nil, fmt.Errorf("Missing account ID")
 	}
 
