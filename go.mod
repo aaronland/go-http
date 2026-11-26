@@ -16,7 +16,7 @@ require (
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
 	github.com/sfomuseum/go-flags v0.12.1
 	github.com/tdewolff/minify/v2 v2.25.0
-	github.com/whosonfirst/go-sanitize v0.1.0
+	github.com/whosonfirst/go-sanitize v1.0.0
 	golang.org/x/net v0.63.0
 )
 

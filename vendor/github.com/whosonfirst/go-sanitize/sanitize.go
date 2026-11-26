@@ -1,25 +1,62 @@
+// Package sanitize removes or replaces problematic Unicode characters from
+// strings and provides strict parsing helpers for numeric input.
+//
+// It is a Go port of the sanitizing routines in Flamework's lib_sanitize.php.
+// Sanitizing a string involves, in order:
+//
+//  1. rejecting input that is not valid UTF-8,
+//  2. removing "evil" code points (most control characters, byte order marks,
+//     bidirectional controls, zero width spaces, Unicode "tag" characters),
+//  3. removing either all "other" (\p{C}) characters or only invalid
+//     non-characters, depending on [Options.StripReserved],
+//  4. normalizing tabs, line breaks, form feeds and replacement characters.
+//
+// Basic usage:
+//
+//	opts := sanitize.DefaultOptions()
+//	clean, err := sanitize.SanitizeString(userInput, opts)
+//
+// Useful references:
+//
+//   - https://github.com/exflickr/flamework/blob/master/www/include/lib_sanitize.php
+//   - https://blog.golang.org/strings
+//   - https://golang.org/pkg/regexp/syntax/
+//   - http://www.fileformat.info/info/unicode/char/search.htm
+//   - http://www.regular-expressions.info/unicode.html
 package sanitize
-
-// https://github.com/exflickr/flamework/blob/master/www/include/lib_sanitize.php
-// https://blog.golang.org/strings
-// https://golang.org/pkg/regexp/syntax/
-// http://www.fileformat.info/info/unicode/char/search.htm
-// http://www.regular-expressions.info/unicode.html
 
 import (
 	"errors"
-	"fmt"
 	_ "log"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 )
 
-var re_evil *regexp.Regexp
-var re_reserved *regexp.Regexp
-var re_invalid *regexp.Regexp
+// Package-level patterns, compiled once in init so SanitizeString does not
+// pay the compile cost for them on every call.
+var (
+	// re_evil matches code points that are never acceptable in sanitized text.
+	re_evil *regexp.Regexp
+	// re_reserved matches the whole Unicode "Other" (\p{C}) category; used
+	// only when Options.StripReserved is set.
+	re_reserved *regexp.Regexp
+	// re_invalid matches non-character sequences (e.g. U+FFFE/U+FFFF and
+	// U+FDD0..U+FDEF); used when StripReserved is not set.
+	re_invalid *regexp.Regexp
+	// re_linefeeds matches tabs, line breaks and replacement characters that
+	// SanitizeString maps to configurable replacements.
+	re_linefeeds *regexp.Regexp
+)
 
+// init builds the package's regular expressions.
+//
+// NOTE: Go's regexp package matches on code points, not raw bytes, so an
+// escape such as \xC2 means U+00C2 rather than the byte 0xC2. The byte-oriented
+// patterns in lib_sanitize therefore don't translate directly; the patterns
+// below are written in terms of code points instead (\x{....}).
 func init() {
 
 	/*
@@ -116,42 +153,26 @@ func init() {
 
 	*/
 
+	// Each entry is a regexp alternative; they are joined with "|" below.
 	evil_codepoints := []string{
-		"[\\x00-\\x08]",
-		"[\\x0E-\\x1F]",
-		"\\x7F", // deviates from lib_sanitize
-		"(?:\\x7F|\\xC2)?[\\x80-\\x84\\x86-\\x9F]", // deviates from lib_sanitize
-		"\\xEF\\xBB\\xBF",
-		"\\x{FEFF}", // deviates from lib_sanitize
-		"\\xE2\\x81[\\xAA-\\xAF]",
-		"\\x{FFF9}", // deviates from lib_sanitize
-		"\\xEF\\xBF[\\xB9-\\xBA]",
-		"\\xF3\\xA0[\\x80-\\x81][\\x80-\\xBF]", // does not always work (see above)
-		"\\xED[\\xA0-\\xBF][\\x80-\\xBF]",
-		"\\xF4[\\x90-\\xbf][\\x80-\\xbf][\\x80-\\xbf]",
+		"[\\x00-\\x08]",                    // C0 controls before TAB
+		"[\\x0E-\\x1F]",                    // C0 controls after CR (TAB, LF, VT, FF, CR are handled separately)
+		"\\x7F",                            // DEL
+		"[\\x{80}-\\x{84}\\x{86}-\\x{9F}]", // C1 controls; U+0085 (NEL) is handled as a line break below
+		"\\x{FEFF}",                        // BOM / zero width no-break space
+		"[\\x{206A}-\\x{206F}]",            // deprecated format controls
+		// Bidirectional controls enable "Trojan Source" and filename spoofing.
+		"[\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2066}-\\x{2069}]",
+		// Invisible characters: zero width space and word joiner. ZWNJ/ZWJ
+		// (U+200C/U+200D) are kept because some scripts and emoji sequences need them.
+		"[\\x{200B}\\x{2060}]",
+		"[\\x{FFF9}-\\x{FFFA}]",   // interlinear annotation anchor/separator
+		"[\\x{E0000}-\\x{E007F}]", // Tags block
+		// Surrogates (U+D800..U+DFFF) and code points above U+10FFFF cannot
+		// appear in valid UTF-8, which SanitizeString checks before matching.
 	}
 
-	/*
-
-		go-sanitize says this is ugly and this is not elegant but it seems to work
-		so we will tolerate it until we can figure out why the RE above doesn't
-		work... also see notes above (20160909/thisisaaronland)
-
-	*/
-
-	lo, _ := strconv.ParseUint("11100000000000000000", 2, 32)
-	hi, _ := strconv.ParseUint("11100000000001111111", 2, 32)
-
-	for i := lo; i < hi; i++ {
-
-		r := rune(i)
-		u := fmt.Sprintf("%U", r)
-		u = strings.Replace(u, "U+", "", -1)
-		tag := "\\x{" + u + "}"
-
-		evil_codepoints = append(evil_codepoints, tag)
-	}
-
+	// Combine every alternative into a single pattern.
 	re_evil = regexp.MustCompile(strings.Join(evil_codepoints, "|"))
 
 	/*
@@ -180,25 +201,43 @@ func init() {
 
 	*/
 
-	re_invalid = regexp.MustCompile("((\\xF4\\x8F|\\xEF|\\xF0\\x9F|\\xF0\\xAF|\\xF0\\xBF|((\\xF1|\\xF2|\\xF3)(\\x8F|\\x9F|\\xAF|\\xBF)))\\xBF(\\xBE|\\xBF))|\\xEF\\xB7[\\x90-\\xAF]")
+	// Matches the Unicode "noncharacters": U+FDD0..U+FDEF and the last two
+	// code points (xFFFE, xFFFF) of each of the 17 planes.
+	re_invalid = regexp.MustCompile(`[\x{FDD0}-\x{FDEF}]|[\x{FFFE}\x{FFFF}\x{1FFFE}\x{1FFFF}\x{2FFFE}\x{2FFFF}\x{3FFFE}\x{3FFFF}\x{4FFFE}\x{4FFFF}\x{5FFFE}\x{5FFFF}\x{6FFFE}\x{6FFFF}\x{7FFFE}\x{7FFFF}\x{8FFFE}\x{8FFFF}\x{9FFFE}\x{9FFFF}\x{AFFFE}\x{AFFFF}\x{BFFFE}\x{BFFFF}\x{CFFFE}\x{CFFFF}\x{DFFFE}\x{DFFFF}\x{EFFFE}\x{EFFFF}\x{FFFFE}\x{FFFFF}\x{10FFFE}\x{10FFFF}]`)
 
-	/*
-
-		linefeed character regular expressions are defined at runtime below
-
-	*/
+	// The set of line-break style characters is fixed, so the pattern is
+	// compiled once; only their replacements vary with Options. "\r\n" is
+	// listed first so a CRLF is matched as one break rather than two.
+	re_linefeeds = regexp.MustCompile("\r\n|\u2028|\u2029|\u0085|\t|\v|\f|\r|\n|\uFFFC|\uFFFD")
 }
 
+// Options controls how SanitizeString behaves.
+//
+// The replacement fields are unexported; obtain a configured value from
+// DefaultOptions or DebugOptions and then adjust the exported fields.
 type Options struct {
-	StripReserved      bool
-	AllowNewlines      bool
-	replacementString  string
-	replacementTab     string
-	replacementLF      string
-	replacementFF      string
+	// StripReserved removes every character in the Unicode "Other" category
+	// (\p{C}: controls, format, private use, unassigned, surrogates). When
+	// false, only invalid non-characters are removed.
+	StripReserved bool
+	// AllowNewlines preserves line breaks as "\n" (and form feeds / paragraph
+	// separators as "\n\n") instead of replacing them.
+	AllowNewlines bool
+	// replacementString replaces removed "evil", reserved and invalid characters.
+	replacementString string
+	// replacementTab replaces horizontal tabs.
+	replacementTab string
+	// replacementLF replaces line breaks (LF, CR, CRLF, NEL, U+2028).
+	replacementLF string
+	// replacementFF replaces form feed, vertical tab and U+2029.
+	replacementFF string
+	// replacementUnknown replaces U+FFFC (object replacement) and U+FFFD
+	// (replacement character).
 	replacementUnknown string
 }
 
+// DefaultOptions returns Options that delete unsafe characters and turn tabs
+// and line breaks into single spaces. Unknown/replacement characters become "?".
 func DefaultOptions() *Options {
 
 	o := Options{
@@ -214,6 +253,8 @@ func DefaultOptions() *Options {
 	return &o
 }
 
+// DebugOptions returns Options that replace every sanitized character with the
+// visible marker " { SANITIZED } ", making it easy to see what was altered.
 func DebugOptions() *Options {
 
 	o := Options{
@@ -229,16 +270,28 @@ func DebugOptions() *Options {
 	return &o
 }
 
+// SanitizeString returns input with unsafe or invisible Unicode characters
+// removed or replaced according to options.
+//
+// It returns an error, and an empty string, if input is not valid UTF-8.
+// If options is nil, DefaultOptions is used.
 func SanitizeString(input string, options *Options) (string, error) {
 
+	if options == nil {
+		options = DefaultOptions()
+	}
+
+	// Invalid UTF-8 can't be reasoned about by the code-point patterns below.
 	if !utf8.ValidString(input) {
 		return "", errors.New("Invalid UTF8 string")
 	}
 
 	output := input
 
+	// Step 1: strip control characters, BOMs, format controls, tags, etc.
 	output = re_evil.ReplaceAllString(output, options.replacementString)
 
+	// Step 2: strip either all "Other" characters or only non-characters.
 	if options.StripReserved {
 
 		output = re_reserved.ReplaceAllString(output, options.replacementString)
@@ -248,14 +301,16 @@ func SanitizeString(input string, options *Options) (string, error) {
 		output = re_invalid.ReplaceAllString(output, options.replacementString)
 	}
 
+	// Step 3: choose what line breaks / form feeds become.
 	lf := options.replacementLF
-	ff := options.replacementLF
+	ff := options.replacementFF
 
 	if options.AllowNewlines {
 		lf = "\n"
 		ff = "\n\n"
 	}
 
+	// Map each whitespace-like character to its replacement.
 	lookup := map[string]string{
 		"\xE2\x80\xA8": lf, // U+2028
 		"\xE2\x80\xA9": ff, // U+2029
@@ -270,14 +325,7 @@ func SanitizeString(input string, options *Options) (string, error) {
 		"\xEF\xBF\xBD": options.replacementUnknown, // U+FFFD
 	}
 
-	lookup_keys := make([]string, 0)
-
-	for k, _ := range lookup {
-		lookup_keys = append(lookup_keys, k)
-	}
-
-	re_linefeeds := regexp.MustCompile(strings.Join(lookup_keys, "|"))
-
+	// Each match is swapped for its mapped replacement.
 	cb_linefeeds := func(s string) string {
 		return lookup[s]
 	}
@@ -287,6 +335,8 @@ func SanitizeString(input string, options *Options) (string, error) {
 	return output, nil
 }
 
+// SanitizeInt32 parses input as a base-10 integer that fits in an int32.
+// It returns the strconv error (syntax or range) if parsing fails.
 func SanitizeInt32(input string) (int32, error) {
 
 	output, err := strconv.ParseInt(input, 10, 32)
@@ -298,12 +348,27 @@ func SanitizeInt32(input string) (int32, error) {
 	return int32(output), nil
 }
 
+// SanitizeInt64 parses input as a base-10 integer that fits in an int64.
+// It returns the strconv error (syntax or range) if parsing fails.
 func SanitizeInt64(input string) (int64, error) {
 
 	return strconv.ParseInt(input, 10, 64)
 }
 
+// SanitizeFloat64 parses input as a 64-bit floating point number.
+// It returns the strconv error (syntax or range) if parsing fails, and an
+// error for NaN and infinite values, which strconv otherwise accepts.
 func SanitizeFloat64(input string) (float64, error) {
 
-	return strconv.ParseFloat(input, 64)
+	output, err := strconv.ParseFloat(input, 64)
+
+	if err != nil {
+		return 0, err
+	}
+
+	if math.IsNaN(output) || math.IsInf(output, 0) {
+		return 0, errors.New("Value is not a finite number")
+	}
+
+	return output, nil
 }
