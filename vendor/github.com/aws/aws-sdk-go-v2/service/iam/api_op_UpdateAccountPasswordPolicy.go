@@ -4,10 +4,9 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Updates the password policy settings for the Amazon Web Services account.
@@ -125,6 +124,42 @@ type UpdateAccountPasswordPolicyInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *UpdateAccountPasswordPolicyInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.UpdateAccountPasswordPolicyRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *UpdateAccountPasswordPolicyInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.AllowUsersToChangePassword != false {
+		s.WriteBool(schemas.UpdateAccountPasswordPolicyRequest_AllowUsersToChangePassword, v.AllowUsersToChangePassword)
+	}
+	if v.HardExpiry != nil {
+		s.WriteBool(schemas.UpdateAccountPasswordPolicyRequest_HardExpiry, *v.HardExpiry)
+	}
+	if v.MaxPasswordAge != nil {
+		s.WriteInt32(schemas.UpdateAccountPasswordPolicyRequest_MaxPasswordAge, *v.MaxPasswordAge)
+	}
+	if v.MinimumPasswordLength != nil {
+		s.WriteInt32(schemas.UpdateAccountPasswordPolicyRequest_MinimumPasswordLength, *v.MinimumPasswordLength)
+	}
+	if v.PasswordReusePrevention != nil {
+		s.WriteInt32(schemas.UpdateAccountPasswordPolicyRequest_PasswordReusePrevention, *v.PasswordReusePrevention)
+	}
+	if v.RequireLowercaseCharacters != false {
+		s.WriteBool(schemas.UpdateAccountPasswordPolicyRequest_RequireLowercaseCharacters, v.RequireLowercaseCharacters)
+	}
+	if v.RequireNumbers != false {
+		s.WriteBool(schemas.UpdateAccountPasswordPolicyRequest_RequireNumbers, v.RequireNumbers)
+	}
+	if v.RequireSymbols != false {
+		s.WriteBool(schemas.UpdateAccountPasswordPolicyRequest_RequireSymbols, v.RequireSymbols)
+	}
+	if v.RequireUppercaseCharacters != false {
+		s.WriteBool(schemas.UpdateAccountPasswordPolicyRequest_RequireUppercaseCharacters, v.RequireUppercaseCharacters)
+	}
+}
+
 type UpdateAccountPasswordPolicyOutput struct {
 	// Metadata pertaining to the operation's result.
 	ResultMetadata middleware.Metadata
@@ -132,74 +167,39 @@ type UpdateAccountPasswordPolicyOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *UpdateAccountPasswordPolicyOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(nil)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *UpdateAccountPasswordPolicyOutput) SerializeMembers(s smithy.ShapeSerializer) {
+}
+func (v *UpdateAccountPasswordPolicyOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, nil, func(s *smithy.Schema) error {
+		switch s {
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationUpdateAccountPasswordPolicyMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.UpdateAccountPasswordPolicy, schemas.UpdateAccountPasswordPolicyRequest, nil)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpUpdateAccountPasswordPolicy{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.UpdateAccountPasswordPolicy, schemas.UpdateAccountPasswordPolicyRequest, nil), output: &UpdateAccountPasswordPolicyOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpUpdateAccountPasswordPolicy{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "UpdateAccountPasswordPolicy"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opUpdateAccountPasswordPolicy(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -214,22 +214,8 @@ func (c *Client) addOperationUpdateAccountPasswordPolicyMiddlewares(stack *middl
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opUpdateAccountPasswordPolicy(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "UpdateAccountPasswordPolicy",
-	}
 }

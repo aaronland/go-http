@@ -4,10 +4,9 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Adds a new client ID (also known as audience) to the list of client IDs already
@@ -50,6 +49,21 @@ type AddClientIDToOpenIDConnectProviderInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *AddClientIDToOpenIDConnectProviderInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.AddClientIDToOpenIDConnectProviderRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *AddClientIDToOpenIDConnectProviderInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.ClientID != nil {
+		s.WriteString(schemas.AddClientIDToOpenIDConnectProviderRequest_ClientID, *v.ClientID)
+	}
+	if v.OpenIDConnectProviderArn != nil {
+		s.WriteString(schemas.AddClientIDToOpenIDConnectProviderRequest_OpenIDConnectProviderArn, *v.OpenIDConnectProviderArn)
+	}
+}
+
 type AddClientIDToOpenIDConnectProviderOutput struct {
 	// Metadata pertaining to the operation's result.
 	ResultMetadata middleware.Metadata
@@ -57,77 +71,42 @@ type AddClientIDToOpenIDConnectProviderOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *AddClientIDToOpenIDConnectProviderOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(nil)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *AddClientIDToOpenIDConnectProviderOutput) SerializeMembers(s smithy.ShapeSerializer) {
+}
+func (v *AddClientIDToOpenIDConnectProviderOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, nil, func(s *smithy.Schema) error {
+		switch s {
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationAddClientIDToOpenIDConnectProviderMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.AddClientIDToOpenIDConnectProvider, schemas.AddClientIDToOpenIDConnectProviderRequest, nil)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpAddClientIDToOpenIDConnectProvider{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.AddClientIDToOpenIDConnectProvider, schemas.AddClientIDToOpenIDConnectProviderRequest, nil), output: &AddClientIDToOpenIDConnectProviderOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpAddClientIDToOpenIDConnectProvider{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "AddClientIDToOpenIDConnectProvider"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpAddClientIDToOpenIDConnectProviderValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opAddClientIDToOpenIDConnectProvider(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -142,22 +121,8 @@ func (c *Client) addOperationAddClientIDToOpenIDConnectProviderMiddlewares(stack
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opAddClientIDToOpenIDConnectProvider(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "AddClientIDToOpenIDConnectProvider",
-	}
 }

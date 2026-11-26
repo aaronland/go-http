@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Uploads an SSH public key and associates it with the specified IAM user.
@@ -71,6 +70,21 @@ type UploadSSHPublicKeyInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *UploadSSHPublicKeyInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.UploadSSHPublicKeyRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *UploadSSHPublicKeyInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.SSHPublicKeyBody != nil {
+		s.WriteString(schemas.UploadSSHPublicKeyRequest_SSHPublicKeyBody, *v.SSHPublicKeyBody)
+	}
+	if v.UserName != nil {
+		s.WriteString(schemas.UploadSSHPublicKeyRequest_UserName, *v.UserName)
+	}
+}
+
 // Contains the response to a successful [UploadSSHPublicKey] request.
 //
 // [UploadSSHPublicKey]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_UploadSSHPublicKey.html
@@ -85,77 +99,50 @@ type UploadSSHPublicKeyOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *UploadSSHPublicKeyOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.UploadSSHPublicKeyResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *UploadSSHPublicKeyOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.SSHPublicKey != nil {
+		s.WriteStruct(schemas.UploadSSHPublicKeyResponse_SSHPublicKey)
+		v.SSHPublicKey.SerializeMembers(s)
+		s.CloseStruct()
+	}
+}
+func (v *UploadSSHPublicKeyOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.UploadSSHPublicKeyResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.UploadSSHPublicKeyResponse_SSHPublicKey:
+			v.SSHPublicKey = &types.SSHPublicKey{}
+			return v.SSHPublicKey.Deserialize(d)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationUploadSSHPublicKeyMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.UploadSSHPublicKey, schemas.UploadSSHPublicKeyRequest, schemas.UploadSSHPublicKeyResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpUploadSSHPublicKey{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.UploadSSHPublicKey, schemas.UploadSSHPublicKeyRequest, schemas.UploadSSHPublicKeyResponse), output: &UploadSSHPublicKeyOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpUploadSSHPublicKey{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "UploadSSHPublicKey"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpUploadSSHPublicKeyValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opUploadSSHPublicKey(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -170,22 +157,8 @@ func (c *Client) addOperationUploadSSHPublicKeyMiddlewares(stack *middleware.Sta
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opUploadSSHPublicKey(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "UploadSSHPublicKey",
-	}
 }

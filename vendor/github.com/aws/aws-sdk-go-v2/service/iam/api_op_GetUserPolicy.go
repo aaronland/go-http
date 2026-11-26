@@ -4,10 +4,9 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Retrieves the specified inline policy document that is embedded in the
@@ -71,6 +70,21 @@ type GetUserPolicyInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetUserPolicyInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetUserPolicyRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetUserPolicyInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.PolicyName != nil {
+		s.WriteString(schemas.GetUserPolicyRequest_PolicyName, *v.PolicyName)
+	}
+	if v.UserName != nil {
+		s.WriteString(schemas.GetUserPolicyRequest_UserName, *v.UserName)
+	}
+}
+
 // Contains the response to a successful [GetUserPolicy] request.
 //
 // [GetUserPolicy]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_GetUserPolicy.html
@@ -101,77 +115,60 @@ type GetUserPolicyOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetUserPolicyOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetUserPolicyResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetUserPolicyOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.PolicyDocument != nil {
+		s.WriteString(schemas.GetUserPolicyResponse_PolicyDocument, *v.PolicyDocument)
+	}
+	if v.PolicyName != nil {
+		s.WriteString(schemas.GetUserPolicyResponse_PolicyName, *v.PolicyName)
+	}
+	if v.UserName != nil {
+		s.WriteString(schemas.GetUserPolicyResponse_UserName, *v.UserName)
+	}
+}
+func (v *GetUserPolicyOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.GetUserPolicyResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.GetUserPolicyResponse_PolicyDocument:
+			v.PolicyDocument = new(string)
+			return d.ReadString(schemas.GetUserPolicyResponse_PolicyDocument, v.PolicyDocument)
+		case schemas.GetUserPolicyResponse_PolicyName:
+			v.PolicyName = new(string)
+			return d.ReadString(schemas.GetUserPolicyResponse_PolicyName, v.PolicyName)
+		case schemas.GetUserPolicyResponse_UserName:
+			v.UserName = new(string)
+			return d.ReadString(schemas.GetUserPolicyResponse_UserName, v.UserName)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationGetUserPolicyMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetUserPolicy, schemas.GetUserPolicyRequest, schemas.GetUserPolicyResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpGetUserPolicy{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetUserPolicy, schemas.GetUserPolicyRequest, schemas.GetUserPolicyResponse), output: &GetUserPolicyOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpGetUserPolicy{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GetUserPolicy"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetUserPolicyValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetUserPolicy(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -186,22 +183,8 @@ func (c *Client) addOperationGetUserPolicyMiddlewares(stack *middleware.Stack, o
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opGetUserPolicy(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GetUserPolicy",
-	}
 }

@@ -1,4 +1,4 @@
-// pcakage random provides methods for generating random strings.
+// package random provides methods for generating random strings.
 package random
 
 import (
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
@@ -15,6 +16,15 @@ const min_length int = 32
 var runes []rune
 
 var r *rand.Rand
+
+// mu guards r since *rand.Rand is not safe for concurrent use.
+var mu sync.Mutex
+
+func randIntn(n int) int {
+	mu.Lock()
+	defer mu.Unlock()
+	return r.Intn(n)
+}
 
 func init() {
 
@@ -82,8 +92,13 @@ func DefaultOptions() *Options {
 	return &opts
 }
 
-// String returns a randomly-generated string configured by 'opts'.
+// String returns a randomly-generated string configured by 'opts'. If 'opts'
+// is nil the result of DefaultOptions is used. It is safe for concurrent use.
 func String(opts *Options) (string, error) {
+
+	if opts == nil {
+		opts = DefaultOptions()
+	}
 
 	count := len(runes)
 
@@ -102,7 +117,7 @@ func String(opts *Options) (string, error) {
 
 	for b < opts.Length {
 
-		j := r.Intn(count)
+		j := randIntn(count)
 		r := runes[j]
 
 		if opts.ASCII && r > 127 {

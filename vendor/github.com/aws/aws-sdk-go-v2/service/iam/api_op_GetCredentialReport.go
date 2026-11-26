@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"time"
 )
 
@@ -36,6 +35,22 @@ type GetCredentialReportInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetCredentialReportInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(nil)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetCredentialReportInput) SerializeMembers(s smithy.ShapeSerializer) {
+}
+func (v *GetCredentialReportInput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, nil, func(s *smithy.Schema) error {
+		switch s {
+		}
+		return nil
+	})
+}
+
 // Contains the response to a successful [GetCredentialReport] request.
 //
 // [GetCredentialReport]: https://docs.aws.amazon.com/IAM/latest/APIReference/API_GetCredentialReport.html
@@ -58,74 +73,60 @@ type GetCredentialReportOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetCredentialReportOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetCredentialReportResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetCredentialReportOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Content != nil {
+		s.WriteBlob(schemas.GetCredentialReportResponse_Content, v.Content)
+	}
+	if v.GeneratedTime != nil {
+		s.WriteTime(schemas.GetCredentialReportResponse_GeneratedTime, *v.GeneratedTime)
+	}
+	if v.ReportFormat != "" {
+		s.WriteString(schemas.GetCredentialReportResponse_ReportFormat, string(v.ReportFormat))
+	}
+}
+func (v *GetCredentialReportOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.GetCredentialReportResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.GetCredentialReportResponse_Content:
+			return d.ReadBlob(schemas.GetCredentialReportResponse_Content, &v.Content)
+		case schemas.GetCredentialReportResponse_GeneratedTime:
+			v.GeneratedTime = new(time.Time)
+			return d.ReadTime(schemas.GetCredentialReportResponse_GeneratedTime, v.GeneratedTime)
+		case schemas.GetCredentialReportResponse_ReportFormat:
+			var ev string
+			if err := d.ReadString(schemas.GetCredentialReportResponse_ReportFormat, &ev); err != nil {
+				return err
+			}
+			v.ReportFormat = types.ReportFormatType(ev)
+			return nil
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationGetCredentialReportMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetCredentialReport, nil, schemas.GetCredentialReportResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpGetCredentialReport{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetCredentialReport, nil, schemas.GetCredentialReportResponse), output: &GetCredentialReportOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpGetCredentialReport{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GetCredentialReport"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetCredentialReport(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -140,22 +141,8 @@ func (c *Client) addOperationGetCredentialReportMiddlewares(stack *middleware.St
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opGetCredentialReport(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GetCredentialReport",
-	}
 }

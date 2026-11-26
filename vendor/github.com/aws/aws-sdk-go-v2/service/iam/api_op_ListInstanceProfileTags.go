@@ -5,10 +5,10 @@ package iam
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Lists the tags that are attached to the specified IAM instance profile. The
@@ -64,6 +64,24 @@ type ListInstanceProfileTagsInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListInstanceProfileTagsInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListInstanceProfileTagsRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListInstanceProfileTagsInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.InstanceProfileName != nil {
+		s.WriteString(schemas.ListInstanceProfileTagsRequest_InstanceProfileName, *v.InstanceProfileName)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListInstanceProfileTagsRequest_Marker, *v.Marker)
+	}
+	if v.MaxItems != nil {
+		s.WriteInt32(schemas.ListInstanceProfileTagsRequest_MaxItems, *v.MaxItems)
+	}
+}
+
 type ListInstanceProfileTagsOutput struct {
 
 	// The list of tags that are currently attached to the IAM instance profile. Each
@@ -91,77 +109,58 @@ type ListInstanceProfileTagsOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListInstanceProfileTagsOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListInstanceProfileTagsResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListInstanceProfileTagsOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListInstanceProfileTagsResponse_IsTruncated, v.IsTruncated)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListInstanceProfileTagsResponse_Marker, *v.Marker)
+	}
+	if v.Tags != nil {
+		serializetagListType(s, schemas.ListInstanceProfileTagsResponse_Tags, v.Tags)
+	}
+}
+func (v *ListInstanceProfileTagsOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListInstanceProfileTagsResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListInstanceProfileTagsResponse_IsTruncated:
+			return d.ReadBool(schemas.ListInstanceProfileTagsResponse_IsTruncated, &v.IsTruncated)
+		case schemas.ListInstanceProfileTagsResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListInstanceProfileTagsResponse_Marker, v.Marker)
+		case schemas.ListInstanceProfileTagsResponse_Tags:
+			return deserializetagListType(d, schemas.ListInstanceProfileTagsResponse_Tags, &v.Tags)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListInstanceProfileTagsMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListInstanceProfileTags, schemas.ListInstanceProfileTagsRequest, schemas.ListInstanceProfileTagsResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListInstanceProfileTags{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListInstanceProfileTags, schemas.ListInstanceProfileTagsRequest, schemas.ListInstanceProfileTagsResponse), output: &ListInstanceProfileTagsOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListInstanceProfileTags{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListInstanceProfileTags"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpListInstanceProfileTagsValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListInstanceProfileTags(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -174,12 +173,6 @@ func (c *Client) addOperationListInstanceProfileTagsMiddlewares(stack *middlewar
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -290,11 +283,3 @@ type ListInstanceProfileTagsAPIClient interface {
 }
 
 var _ ListInstanceProfileTagsAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opListInstanceProfileTags(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListInstanceProfileTags",
-	}
-}

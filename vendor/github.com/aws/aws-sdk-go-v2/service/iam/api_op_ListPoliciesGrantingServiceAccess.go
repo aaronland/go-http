@@ -4,11 +4,10 @@ package iam
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/iam/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Retrieves a list of policies that the IAM identity (user, group, or role) can
@@ -94,6 +93,24 @@ type ListPoliciesGrantingServiceAccessInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListPoliciesGrantingServiceAccessInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListPoliciesGrantingServiceAccessRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListPoliciesGrantingServiceAccessInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Arn != nil {
+		s.WriteString(schemas.ListPoliciesGrantingServiceAccessRequest_Arn, *v.Arn)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListPoliciesGrantingServiceAccessRequest_Marker, *v.Marker)
+	}
+	if v.ServiceNamespaces != nil {
+		serializeserviceNamespaceListType(s, schemas.ListPoliciesGrantingServiceAccessRequest_ServiceNamespaces, v.ServiceNamespaces)
+	}
+}
+
 type ListPoliciesGrantingServiceAccessOutput struct {
 
 	// A ListPoliciesGrantingServiceAccess object that contains details about the
@@ -118,77 +135,58 @@ type ListPoliciesGrantingServiceAccessOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListPoliciesGrantingServiceAccessOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListPoliciesGrantingServiceAccessResponse)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListPoliciesGrantingServiceAccessOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.IsTruncated != false {
+		s.WriteBool(schemas.ListPoliciesGrantingServiceAccessResponse_IsTruncated, v.IsTruncated)
+	}
+	if v.Marker != nil {
+		s.WriteString(schemas.ListPoliciesGrantingServiceAccessResponse_Marker, *v.Marker)
+	}
+	if v.PoliciesGrantingServiceAccess != nil {
+		serializelistPolicyGrantingServiceAccessResponseListType(s, schemas.ListPoliciesGrantingServiceAccessResponse_PoliciesGrantingServiceAccess, v.PoliciesGrantingServiceAccess)
+	}
+}
+func (v *ListPoliciesGrantingServiceAccessOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListPoliciesGrantingServiceAccessResponse, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListPoliciesGrantingServiceAccessResponse_IsTruncated:
+			return d.ReadBool(schemas.ListPoliciesGrantingServiceAccessResponse_IsTruncated, &v.IsTruncated)
+		case schemas.ListPoliciesGrantingServiceAccessResponse_Marker:
+			v.Marker = new(string)
+			return d.ReadString(schemas.ListPoliciesGrantingServiceAccessResponse_Marker, v.Marker)
+		case schemas.ListPoliciesGrantingServiceAccessResponse_PoliciesGrantingServiceAccess:
+			return deserializelistPolicyGrantingServiceAccessResponseListType(d, schemas.ListPoliciesGrantingServiceAccessResponse_PoliciesGrantingServiceAccess, &v.PoliciesGrantingServiceAccess)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListPoliciesGrantingServiceAccessMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListPoliciesGrantingServiceAccess, schemas.ListPoliciesGrantingServiceAccessRequest, schemas.ListPoliciesGrantingServiceAccessResponse)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpListPoliciesGrantingServiceAccess{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListPoliciesGrantingServiceAccess, schemas.ListPoliciesGrantingServiceAccessRequest, schemas.ListPoliciesGrantingServiceAccessResponse), output: &ListPoliciesGrantingServiceAccessOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpListPoliciesGrantingServiceAccess{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListPoliciesGrantingServiceAccess"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options, c); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpListPoliciesGrantingServiceAccessValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListPoliciesGrantingServiceAccess(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -203,22 +201,8 @@ func (c *Client) addOperationListPoliciesGrantingServiceAccessMiddlewares(stack 
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opListPoliciesGrantingServiceAccess(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListPoliciesGrantingServiceAccess",
-	}
 }
