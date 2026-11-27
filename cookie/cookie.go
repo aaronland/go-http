@@ -4,12 +4,9 @@ package cookie
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"net/url"
-	"sort"
 
-	"github.com/aaronland/go-roster"
+	"github.com/aaronland/go-roster/v2"
 	"github.com/awnumar/memguard"
 )
 
@@ -32,77 +29,22 @@ type Cookie interface {
 }
 
 // CookieInitializeFunc is a function used to initialize an implementation of the `Cookie` interface.
-type CookieInitializeFunc func(context.Context, string) (Cookie, error)
+type CookieInitializeFunc = roster.Factory[Cookie]
 
-var cookies roster.Roster
-
-func ensureCookies() error {
-
-	if cookies == nil {
-
-		r, err := roster.NewDefaultRoster()
-
-		if err != nil {
-			return err
-		}
-
-		cookies = r
-	}
-
-	return nil
-}
+var cookies = roster.NewRegistry[Cookie]()
 
 // RegisterCookie associates 'scheme' with 'f' in an internal list of available `Cookie` implementations.
 func RegisterCookie(ctx context.Context, scheme string, f CookieInitializeFunc) error {
-
-	err := ensureCookies()
-
-	if err != nil {
-		return err
-	}
-
 	return cookies.Register(ctx, scheme, f)
 }
 
 // NewCookie returns a new instance of `Cookie` for the scheme associated with 'uri'. It is assumed that this scheme
 // will have previously been "registered" with the `RegisterCookie` method.
 func NewCookie(ctx context.Context, uri string) (Cookie, error) {
-
-	err := ensureCookies()
-
-	if err != nil {
-		return nil, err
-	}
-
-	u, err := url.Parse(uri)
-
-	if err != nil {
-		return nil, err
-	}
-
-	scheme := u.Scheme
-
-	i, err := cookies.Driver(ctx, scheme)
-
-	if err != nil {
-		return nil, err
-	}
-
-	f := i.(CookieInitializeFunc)
-	return f(ctx, uri)
+	return cookies.New(ctx, uri)
 }
 
 // Schemes returns the list of schemes that have been "registered".
 func Schemes() []string {
-	ctx := context.Background()
-	drivers := cookies.Drivers(ctx)
-
-	schemes := make([]string, len(drivers))
-
-	for idx, dr := range drivers {
-		schemes[idx] = fmt.Sprintf("%s://", dr)
-	}
-
-	sort.Strings(schemes)
-	return schemes
+	return cookies.Schemes(context.Background())
 }

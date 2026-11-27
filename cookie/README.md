@@ -17,8 +17,8 @@ import (
 func main() {
 
 	name := "c"
-	secret := "s33kret"
-	salt := "s4lty"
+	secret := "0123456789abcdef0123456789abcdef" // must be exactly 32 bytes
+	salt := "s4lty" // required but unused; the secret is used directly as the key
 	
 	cookie_uri := fmt.Sprintf("encrypted://?name=%s&secret=%s&salt=%s", name, secret, salt)
 	ck, _ := cookie.NewCookie(ctx, cookie_uri)
@@ -27,6 +27,5 @@ func main() {
 
 ## See also
 
-* https://github.com/aaronland/go-secretbox
 * https://godoc.org/golang.org/x/crypto/nacl/secretbox
 * https://github.com/awnumar/memguard

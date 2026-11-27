@@ -4,13 +4,10 @@ package crumb
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"net/url"
-	"sort"
 	"strings"
 
-	"github.com/aaronland/go-roster"
+	"github.com/aaronland/go-roster/v2"
 )
 
 // Crumb is an interface for generating and validating HTTP crumb strings.
@@ -26,83 +23,24 @@ type Crumb interface {
 }
 
 // CrumbInitializeFunc is a function used to initialize packages that implement the `Crumb` interface.
-type CrumbInitializeFunc func(context.Context, string) (Crumb, error)
+type CrumbInitializeFunc = roster.Factory[Crumb]
 
-var crumbs roster.Roster
-
-func ensureCrumbs() error {
-
-	if crumbs == nil {
-
-		r, err := roster.NewDefaultRoster()
-
-		if err != nil {
-			return fmt.Errorf("Failed to create new roster,%w", err)
-		}
-
-		crumbs = r
-	}
-
-	return nil
-}
+var crumbs = roster.NewRegistry[Crumb]()
 
 // RegisterCrumb registers 'scheme' with 'f' for URIs passed to the `NewCrumb` method.
 func RegisterCrumb(ctx context.Context, scheme string, f CrumbInitializeFunc) error {
-
-	err := ensureCrumbs()
-
-	if err != nil {
-		return fmt.Errorf("Failed to ensure crumbs, %w", err)
-	}
-
 	return crumbs.Register(ctx, scheme, f)
 }
 
 // NewCrumb returns a new `Crumb` instance for 'uri'. It is assumed that the scheme of 'uri' has been registered
 // using the `RegisterCrumb` method.
 func NewCrumb(ctx context.Context, uri string) (Crumb, error) {
-
-	err := ensureCrumbs()
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to ensure crumbs, %w", err)
-	}
-
-	u, err := url.Parse(uri)
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse URI, %w", err)
-	}
-
-	scheme := u.Scheme
-
-	i, err := crumbs.Driver(ctx, scheme)
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to derive driver for %s, %w", scheme, err)
-	}
-
-	if i == nil {
-		return nil, fmt.Errorf("Missing initialization func for %s", scheme)
-	}
-
-	f := i.(CrumbInitializeFunc)
-	return f(ctx, uri)
+	return crumbs.New(ctx, uri)
 }
 
 // Schemes returns the list of schemes that have registered for use with the `NewCrumb` method.
 func Schemes() []string {
-	ctx := context.Background()
-	drivers := crumbs.Drivers(ctx)
-
-	schemes := make([]string, len(drivers))
-
-	for idx, dr := range drivers {
-		schemes[idx] = fmt.Sprintf("%s://", dr)
-	}
-
-	sort.Strings(schemes)
-	return schemes
+	return crumbs.Schemes(context.Background())
 }
 
 // SchemesAsString returns the list of schemes that have registered for use with the `NewCrumb`

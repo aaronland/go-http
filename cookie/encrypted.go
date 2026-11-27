@@ -2,14 +2,22 @@ package cookie
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
-	"github.com/aaronland/go-secretbox"
 	"github.com/aaronland/go-string/random"
 	"github.com/awnumar/memguard"
+	"golang.org/x/crypto/nacl/secretbox"
 )
+
+// secretKeySize is the required length (in bytes) of the secret used to encrypt cookies.
+const secretKeySize = 32
+
+const nonceSize = 24
 
 func init() {
 	ctx := context.Background()
@@ -78,7 +86,9 @@ func NewRandomEncryptedCookieURI(name string) (string, error) {
 //
 //	encrypted://?name={NAME}&secret={SECRET}&salt={SALT}
 //
-// Where `{NAME}` is the name of the cookie for all subsequent operations; `{SECRET}` is the secret key used to encrypt the value of the cookie; `{SALT}` is the salt used to encrypt the cookie.
+// Where `{NAME}` is the name of the cookie for all subsequent operations; `{SECRET}` is the secret key used to encrypt the value
+// of the cookie and must be exactly 32 bytes long. `{SALT}` is required for backwards compatibility but is not used: the secret is
+// used directly as a NaCl secretbox key.
 func NewEncryptedCookie(ctx context.Context, uri string) (Cookie, error) {
 
 	u, err := url.Parse(uri)
@@ -105,6 +115,10 @@ func NewEncryptedCookie(ctx context.Context, uri string) (Cookie, error) {
 		return nil, fmt.Errorf("Invalid salt value (empty)")
 	}
 
+	if len(secret) != secretKeySize {
+		return nil, fmt.Errorf("Invalid secret value (must be exactly %d bytes)", secretKeySize)
+	}
+
 	secret_key := memguard.NewEnclave([]byte(secret))
 
 	c := EncryptedCookie{
@@ -127,7 +141,8 @@ func (c *EncryptedCookie) GetString(req *http.Request) (string, error) {
 
 	defer buf.Destroy()
 
-	return buf.String(), nil
+	// buf.String() aliases the locked memory, which is freed by Destroy, so copy the bytes.
+	return string(buf.Bytes()), nil
 }
 
 // Get returns the value of the cookie associated with 'c' in 'req' as an unencrypted `memguard.LockedBuffer` instance.
@@ -139,16 +154,7 @@ func (c *EncryptedCookie) Get(req *http.Request) (*memguard.LockedBuffer, error)
 		return nil, fmt.Errorf("Failed to retrieve cookie, %w", err)
 	}
 
-	opts := secretbox.NewSecretboxOptions()
-	opts.Salt = c.salt
-
-	sb, err := secretbox.NewSecretboxWithEnclave(c.secret, opts)
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create secretbox, %w", err)
-	}
-
-	return sb.Unlock(http_cookie.Value)
+	return c.unlock(http_cookie.Value)
 }
 
 // SetString assigns 'value' as an encrypted string to a cookie associated with 'c' to 'rsp'.
@@ -188,16 +194,7 @@ func (c *EncryptedCookie) SetWithCookie(rsp http.ResponseWriter, buf *memguard.L
 		return fmt.Errorf("Cookie name already set")
 	}
 
-	opts := secretbox.NewSecretboxOptions()
-	opts.Salt = c.salt
-
-	sb, err := secretbox.NewSecretboxWithEnclave(c.secret, opts)
-
-	if err != nil {
-		return fmt.Errorf("Failed to create new secretbox, %w", err)
-	}
-
-	enc, err := sb.LockWithBuffer(buf)
+	enc, err := c.lock(buf)
 
 	if err != nil {
 		return fmt.Errorf("Failed to lock buffer, %w", err)
@@ -224,4 +221,58 @@ func (c *EncryptedCookie) Delete(rsp http.ResponseWriter) error {
 
 	http.SetCookie(rsp, &http_cookie)
 	return nil
+}
+
+// lock encrypts 'buf' with a random nonce and returns the base64-encoded nonce and ciphertext.
+func (c *EncryptedCookie) lock(buf *memguard.LockedBuffer) (string, error) {
+
+	var nonce [nonceSize]byte
+
+	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		return "", fmt.Errorf("Failed to create nonce, %w", err)
+	}
+
+	key, err := c.secret.Open()
+
+	if err != nil {
+		return "", fmt.Errorf("Failed to open enclave, %w", err)
+	}
+
+	defer key.Destroy()
+
+	enc := secretbox.Seal(nonce[:], buf.Bytes(), &nonce, key.ByteArray32())
+	return base64.StdEncoding.EncodeToString(enc), nil
+}
+
+// unlock decrypts a value produced by `lock`.
+func (c *EncryptedCookie) unlock(value string) (*memguard.LockedBuffer, error) {
+
+	body, err := base64.StdEncoding.DecodeString(value)
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to decode string, %w", err)
+	}
+
+	if len(body) < nonceSize+secretbox.Overhead {
+		return nil, fmt.Errorf("Invalid encrypted value")
+	}
+
+	var nonce [nonceSize]byte
+	copy(nonce[:], body[:nonceSize])
+
+	key, err := c.secret.Open()
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to open enclave, %w", err)
+	}
+
+	defer key.Destroy()
+
+	out, ok := secretbox.Open(nil, body[nonceSize:], &nonce, key.ByteArray32())
+
+	if !ok {
+		return nil, fmt.Errorf("Unable to open secretbox")
+	}
+
+	return memguard.NewBufferFromBytes(out), nil
 }

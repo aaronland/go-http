@@ -6,11 +6,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
-	"sort"
-	"strings"
 
-	"github.com/aaronland/go-roster"
+	"github.com/aaronland/go-roster/v2"
 )
 
 // Authenticator is a simple interface for enforcing authentication in HTTP handlers.
@@ -27,11 +24,11 @@ type Authenticator interface {
 	SignupHandler() http.Handler
 }
 
-var authenticator_roster roster.Roster
-
 // AuthenticatorInitializationFunc is a function defined by individual authenticator packages and used to create
 // an instance of that authenticator.
-type AuthenticatorInitializationFunc func(ctx context.Context, uri string) (Authenticator, error)
+type AuthenticatorInitializationFunc = roster.Factory[Authenticator]
+
+var authenticator_roster = roster.NewRegistry[Authenticator]()
 
 // MustRegisterAuthenticator calls `RegisterAuthenticator` and panics if registration fails.
 func MustRegisterAuthenticator(ctx context.Context, scheme string, init_func AuthenticatorInitializationFunc) {
@@ -46,30 +43,7 @@ func MustRegisterAuthenticator(ctx context.Context, scheme string, init_func Aut
 // RegisterAuthenticator registers 'scheme' as a key pointing to 'init_func' in an internal lookup table
 // used to create new `Authenticator` instances by the `NewAuthenticator` method.
 func RegisterAuthenticator(ctx context.Context, scheme string, init_func AuthenticatorInitializationFunc) error {
-
-	err := ensureAuthenticatorRoster()
-
-	if err != nil {
-		return err
-	}
-
 	return authenticator_roster.Register(ctx, scheme, init_func)
-}
-
-func ensureAuthenticatorRoster() error {
-
-	if authenticator_roster == nil {
-
-		r, err := roster.NewDefaultRoster()
-
-		if err != nil {
-			return err
-		}
-
-		authenticator_roster = r
-	}
-
-	return nil
 }
 
 // NewAuthenticator returns a new `Authenticator` instance configured by 'uri'. The value of 'uri' is parsed
@@ -77,42 +51,10 @@ func ensureAuthenticatorRoster() error {
 // function used to instantiate the new `Authenticator`. It is assumed that the scheme (and initialization
 // function) have been registered by the `RegisterAuthenticator` method.
 func NewAuthenticator(ctx context.Context, uri string) (Authenticator, error) {
-
-	u, err := url.Parse(uri)
-
-	if err != nil {
-		return nil, err
-	}
-
-	scheme := u.Scheme
-
-	i, err := authenticator_roster.Driver(ctx, scheme)
-
-	if err != nil {
-		return nil, err
-	}
-
-	init_func := i.(AuthenticatorInitializationFunc)
-	return init_func(ctx, uri)
+	return authenticator_roster.New(ctx, uri)
 }
 
 // Schemes returns the list of schemes that have been registered.
 func Schemes() []string {
-
-	ctx := context.Background()
-	schemes := []string{}
-
-	err := ensureAuthenticatorRoster()
-
-	if err != nil {
-		return schemes
-	}
-
-	for _, dr := range authenticator_roster.Drivers(ctx) {
-		scheme := fmt.Sprintf("%s://", strings.ToLower(dr))
-		schemes = append(schemes, scheme)
-	}
-
-	sort.Strings(schemes)
-	return schemes
+	return authenticator_roster.Schemes(context.Background())
 }

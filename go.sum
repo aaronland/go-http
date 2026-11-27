@@ -26,10 +26,8 @@ github.com/NYTimes/gziphandler v1.1.1 h1:ZUDjpQae29j0ryrS0u/B8HZfJBtBQHjqw2rQ2cq
 github.com/NYTimes/gziphandler v1.1.1/go.mod h1:n/CVRwUEOgIxrgPvAQhUUr9oeUtvrhMomdKFjzJNB0c=
 github.com/aaronland/go-aws/v3 v3.7.3 h1:4r+BkVHDti3rCveewG7S9pVGfDxRXQVdOuwFu0lrUSM=
 github.com/aaronland/go-aws/v3 v3.7.3/go.mod h1:eyNfJ0sPp09DtB2IcFa0mMjkspqVt/hMi0KA/EQQCko=
-github.com/aaronland/go-roster v1.0.0 h1:FRDGrTqsYySKjWnAhbBGXyeGlI/o5/t9FZYCbUmyQtI=
-github.com/aaronland/go-roster v1.0.0/go.mod h1:KIsYZgrJlAsyb9LsXSCvlqvbcCBVjCSqcQiZx42i9ro=
-github.com/aaronland/go-secretbox v1.0.1 h1:skXMwYHqoIEN2XQXL/icj5FpfMKtORjPQJjTbCPnRBk=
-github.com/aaronland/go-secretbox v1.0.1/go.mod h1:X2tdzYdX4amaUsHW7AFFQ0toei2CrlMQ1Cdstdi9FAk=
+github.com/aaronland/go-roster/v2 v2.0.0 h1:0+gfvFZD+vApuvXcRLqVyS2svJsBT2Gcf1x25/Qq0HA=
+github.com/aaronland/go-roster/v2 v2.0.0/go.mod h1:2dB2U+fl6VrC5auRAa65UK6nqDTgUJePTuwmB9+HAnQ=
 github.com/aaronland/go-string v1.0.1 h1:ZYXGCbAdaAXSqaFoZVK737SEcFgl4w+AHg66TsMJwFA=
 github.com/aaronland/go-string v1.0.1/go.mod h1:URh3Au/fNbM0++WjBseurE3QTp875wiJ9ImrecD+7tI=
 github.com/aaronland/gocloud v1.3.6 h1:W/tQxOyG+mXIVwgoXetskOdfTC5itEkSE4bDKVyIWXQ=

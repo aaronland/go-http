@@ -4,8 +4,7 @@ go 1.27.4
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/aaronland/go-roster v1.0.0
-	github.com/aaronland/go-secretbox v1.0.1
+	github.com/aaronland/go-roster/v2 v2.0.0
 	github.com/aaronland/go-string v1.0.1
 	github.com/aaronland/gocloud v1.3.6
 	github.com/akrylysov/algnhsa v1.1.0
@@ -17,6 +16,7 @@ require (
 	github.com/sfomuseum/go-flags v0.12.1
 	github.com/tdewolff/minify/v2 v2.25.0
 	github.com/whosonfirst/go-sanitize v1.0.0
+	golang.org/x/crypto v0.59.0
 	golang.org/x/net v0.63.0
 )
 
@@ -62,7 +62,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	gocloud.dev v0.49.0 // indirect
-	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
