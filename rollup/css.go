@@ -61,7 +61,6 @@ func RollupCSSHandler(opts *RollupCSSHandlerOptions) (http.Handler, error) {
 			}
 		}
 
-		return
 	}
 
 	return http.HandlerFunc(fn), nil

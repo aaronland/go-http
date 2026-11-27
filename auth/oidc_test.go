@@ -74,9 +74,7 @@ func TestOIDCAuthenticatorFlow(t *testing.T) {
 	defer idp.Close()
 	issuer = idp.URL
 
-	var rp *httptest.Server
-
-	rp = httptest.NewUnstartedServer(nil)
+	rp := httptest.NewUnstartedServer(nil)
 	rp.Start()
 	defer rp.Close()
 

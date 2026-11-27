@@ -76,7 +76,6 @@ func debugHandler(authenticator auth.Authenticator) http.Handler {
 
 		msg := fmt.Sprintf("Hello, %s (%s)", acct.Name(), acct.Id())
 		rsp.Write([]byte(msg))
-		return
 	}
 
 	return http.HandlerFunc(fn)

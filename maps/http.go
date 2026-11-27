@@ -25,7 +25,6 @@ func MapConfigHandler(cfg *MapConfig) http.Handler {
 			http.Error(rsp, "Internal server error", http.StatusInternalServerError)
 		}
 
-		return
 	}
 
 	return http.HandlerFunc(fn)
@@ -88,13 +87,13 @@ func MapConfigFromOptions(opts *AssignMapConfigHandlerOptions) (*MapConfig, erro
 		switch len(parts) {
 		case 2:
 
-			lon, err := strconv.ParseFloat(parts[0], 10)
+			lon, err := strconv.ParseFloat(parts[0], 64)
 
 			if err != nil {
 				return nil, fmt.Errorf("Failed to parse longitude, %w", err)
 			}
 
-			lat, err := strconv.ParseFloat(parts[1], 10)
+			lat, err := strconv.ParseFloat(parts[1], 64)
 
 			if err != nil {
 				return nil, fmt.Errorf("Failed to parse latitude, %w", err)
@@ -104,13 +103,13 @@ func MapConfigFromOptions(opts *AssignMapConfigHandlerOptions) (*MapConfig, erro
 
 		case 3:
 
-			lon, err := strconv.ParseFloat(parts[0], 10)
+			lon, err := strconv.ParseFloat(parts[0], 64)
 
 			if err != nil {
 				return nil, fmt.Errorf("Failed to parse longitude, %w", err)
 			}
 
-			lat, err := strconv.ParseFloat(parts[1], 10)
+			lat, err := strconv.ParseFloat(parts[1], 64)
 
 			if err != nil {
 				return nil, fmt.Errorf("Failed to parse latitude, %w", err)
@@ -127,25 +126,25 @@ func MapConfigFromOptions(opts *AssignMapConfigHandlerOptions) (*MapConfig, erro
 
 		case 4:
 
-			minx, err := strconv.ParseFloat(parts[0], 10)
+			minx, err := strconv.ParseFloat(parts[0], 64)
 
 			if err != nil {
 				return nil, fmt.Errorf("Invalid minx, %w", err)
 			}
 
-			miny, err := strconv.ParseFloat(parts[1], 10)
+			miny, err := strconv.ParseFloat(parts[1], 64)
 
 			if err != nil {
 				return nil, fmt.Errorf("Invalid miny, %w", err)
 			}
 
-			maxx, err := strconv.ParseFloat(parts[2], 10)
+			maxx, err := strconv.ParseFloat(parts[2], 64)
 
 			if err != nil {
 				return nil, fmt.Errorf("Invalid maxx, %w", err)
 			}
 
-			maxy, err := strconv.ParseFloat(parts[3], 10)
+			maxy, err := strconv.ParseFloat(parts[3], 64)
 
 			if err != nil {
 				return nil, fmt.Errorf("Invalid maxy, %w", err)

@@ -74,7 +74,6 @@ func (a *SharedSecretAuthenticator) WrapHandler(next http.Handler) http.Handler 
 		}
 
 		next.ServeHTTP(rsp, req)
-		return
 	}
 
 	return http.HandlerFunc(fn)

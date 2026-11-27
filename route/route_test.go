@@ -18,7 +18,6 @@ func TestRouteHandler(t *testing.T) {
 
 		fn := func(rsp http.ResponseWriter, req *http.Request) {
 			rsp.Write([]byte(req.PathValue("id")))
-			return
 		}
 
 		return http.HandlerFunc(fn), nil
@@ -29,7 +28,6 @@ func TestRouteHandler(t *testing.T) {
 		fn := func(rsp http.ResponseWriter, req *http.Request) {
 			body := fmt.Sprintf("%s %s", req.PathValue("hello"), req.PathValue("world"))
 			rsp.Write([]byte(body))
-			return
 		}
 
 		return http.HandlerFunc(fn), nil
@@ -39,7 +37,6 @@ func TestRouteHandler(t *testing.T) {
 
 		fn := func(rsp http.ResponseWriter, req *http.Request) {
 			rsp.Write([]byte(`foo`))
-			return
 		}
 
 		return http.HandlerFunc(fn), nil
@@ -49,7 +46,6 @@ func TestRouteHandler(t *testing.T) {
 
 		fn := func(rsp http.ResponseWriter, req *http.Request) {
 			rsp.Write([]byte(`bar`))
-			return
 		}
 
 		return http.HandlerFunc(fn), nil
@@ -129,7 +125,7 @@ func TestRouteHandler(t *testing.T) {
 		"http://localhost:8080/also/wrong/host/": "",
 	}
 
-	for uri, _ := range tests_to_fail {
+	for uri := range tests_to_fail {
 
 		rsp, err := http.Get(uri)
 

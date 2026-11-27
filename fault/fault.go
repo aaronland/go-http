@@ -68,11 +68,7 @@ func ImplementsFaultHandlerVars(vars any) bool {
 
 	e := dv.FieldByName("Error")
 
-	if !e.CanSet() {
-		return false
-	}
-
-	return true
+	return e.CanSet()
 }
 
 func defaultFaultHandlerVars() any {
@@ -243,7 +239,6 @@ func FaultHandlerWithOptions(opts *FaultHandlerOptions) http.Handler {
 		err_msg := fmt.Sprintf("There was a problem completing your request (%d)", status)
 		http.Error(rsp, err_msg, status)
 
-		return
 	}
 
 	h := http.HandlerFunc(fn)

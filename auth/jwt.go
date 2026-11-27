@@ -119,7 +119,6 @@ func (a *JWTAuthenticator) WrapHandler(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(rsp, req)
-		return
 	}
 
 	return http.HandlerFunc(fn)

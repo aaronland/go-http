@@ -24,7 +24,7 @@ var re_mutex = new(sync.RWMutex)
 
 // not_a_slash returns the regular expression "([^\/]+)" used to replace "{label}" style strings in URL patterns.
 func not_a_slash(s string) string {
-	return fmt.Sprintf(`([^\/]+)`)
+	return `([^\/]+)`
 }
 
 // Local cache of wildcard regular expressions that have been derived from patterns with "{label}" style substitutions
@@ -87,7 +87,7 @@ func RouteHandlerWithOptions(opts *RouteHandlerOptions) (http.Handler, error) {
 	matches := new(sync.Map)
 	patterns := make([]string, 0)
 
-	for p, _ := range opts.Handlers {
+	for p := range opts.Handlers {
 		patterns = append(patterns, p)
 	}
 
@@ -138,7 +138,6 @@ func RouteHandlerWithOptions(opts *RouteHandlerOptions) (http.Handler, error) {
 
 		logger.Debug("Serve derived handler", "pattern", derive_rsp.MatchingPattern, "path values", derive_rsp.PathValues)
 		derive_rsp.Handler.ServeHTTP(rsp, req)
-		return
 	}
 
 	return http.HandlerFunc(fn), nil

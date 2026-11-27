@@ -111,7 +111,6 @@ func TestFaultHandlerWithCustomVars(t *testing.T) {
 		err := fmt.Errorf("This is a test")
 		AssignError(req, err, 999)
 		fh.ServeHTTP(rsp, req)
-		return
 	}
 
 	h := http.HandlerFunc(fn)

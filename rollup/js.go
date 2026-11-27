@@ -70,7 +70,6 @@ func RollupJSHandler(opts *RollupJSHandlerOptions) (http.Handler, error) {
 			rsp.Write([]byte(`;`))
 		}
 
-		return
 	}
 
 	return http.HandlerFunc(fn), nil

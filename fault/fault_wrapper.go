@@ -54,7 +54,6 @@ func TemplatedFaultHandlerWrapper(l *log.Logger, t *template.Template, h http.Ha
 		}
 
 		fh.ServeHTTP(rsp, req)
-		return
 	}
 
 	return http.HandlerFunc(fn)

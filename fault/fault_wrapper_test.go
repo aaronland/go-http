@@ -12,7 +12,6 @@ import (
 func okHandler() http.Handler {
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {
-		return
 	}
 
 	return http.HandlerFunc(fn)
@@ -28,7 +27,6 @@ func errorHandler() http.Handler {
 		AssignError(req, err, code)
 		rsp.WriteHeader(http.StatusBadRequest)
 
-		return
 	}
 
 	return http.HandlerFunc(fn)
