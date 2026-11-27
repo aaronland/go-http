@@ -10,6 +10,13 @@ cli:
 	go build -mod $(GOMOD) -ldflags="$(LDFLAGS)" -o bin/encrypted-crumb cmd/crumb/encrypted-crumb/main.go
 	go build -mod $(GOMOD) -ldflags="$(LDFLAGS)" -o bin/fileserver cmd/fileserver/fileserver/main.go
 
+FUZZTIME=30s
+
+fuzz:
+	go test ./crumb    -run '^$$' -fuzz FuzzEncryptedCrumbValidate -fuzztime $(FUZZTIME)
+	go test ./sanitize -run '^$$' -fuzz FuzzGetString              -fuzztime $(FUZZTIME)
+	go test ./cookie   -run '^$$' -fuzz FuzzEncryptedCookieGet     -fuzztime $(FUZZTIME)
+
 INITIAL_VIEW=-122.384292,37.621131,13
 
 map-example:
