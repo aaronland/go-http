@@ -175,6 +175,11 @@ func deriveHandler(req *http.Request, handlers map[string]RouteHandlerFunc, matc
 
 	for _, p := range patterns {
 
+		// Don't let the method and host of a previously evaluated (and non-matching)
+		// pattern leak in to the next one.
+		method = ""
+		host = ""
+
 		// slog.Info("ROUTE", "pattern", p)
 
 		// First just try the simple prefix-based approach
@@ -217,7 +222,7 @@ func deriveHandler(req *http.Request, handlers map[string]RouteHandlerFunc, matc
 
 		if !exists {
 
-			str_wildcard := re_braces.ReplaceAllStringFunc(route_path, not_a_slash)
+			str_wildcard := "^" + re_braces.ReplaceAllStringFunc(route_path, not_a_slash)
 			re, err := regexp.Compile(str_wildcard)
 
 			if err != nil {

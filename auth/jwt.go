@@ -15,9 +15,13 @@ import (
 )
 
 // AUTHORIZATION_HEADER is the default name of the HTTP header that is checked for a bearer JWT.
-const AUTHORIZATION_HEADER string = "Authentication"
+const AUTHORIZATION_HEADER string = "Authorization"
 
-var re_auth = regexp.MustCompile(`Bearer\s+((?:[_\-A-Za-z0-9+/]*={0,3})\.(?:[_\-A-Za-z0-9+/]*={0,3})\.([_\-A-Za-z0-9+/]*={0,3}))$`)
+// LEGACY_AUTHORIZATION_HEADER is the non-standard header name that was the default in earlier releases.
+// It is still accepted as a fallback when the default header is in use.
+const LEGACY_AUTHORIZATION_HEADER string = "Authentication"
+
+var re_auth = regexp.MustCompile(`^Bearer\s+((?:[_\-A-Za-z0-9+/]*={0,3})\.(?:[_\-A-Za-z0-9+/]*={0,3})\.([_\-A-Za-z0-9+/]*={0,3}))$`)
 
 func init() {
 	ctx := context.Background()
@@ -53,7 +57,7 @@ type JWTAuthenticator struct {
 // Where {GOCLOUD_DEV_RUNTIMEVAR_URI} is a valid `gocloud.dev/runtimevar` URI used to dereference the JWT signing secret.
 // Under the hood this method uses the `github.com/sfomuseum/runtimevar.StringVar` method to dereference runtimevar URIs.
 //
-// By default a `JWTAuthenticator` instance looks for JWT Bearer tokens in the HTTP "Authentication" header. This behaviour
+// By default a `JWTAuthenticator` instance looks for JWT Bearer tokens in the HTTP "Authorization" header (falling back to the legacy "Authentication" header). This behaviour
 // can be customized by passing an "authorization-header" query parameter in 'uri'. For example:
 //
 //	jwt://?authorization-header=X-Custom-AuthHeader
@@ -128,8 +132,14 @@ func (a *JWTAuthenticator) GetAccountForRequest(req *http.Request) (Account, err
 
 	auth_header := req.Header.Get(a.authorization_header)
 
+	// Fall back to the legacy header name when using the default header.
+	if auth_header == "" && a.authorization_header == AUTHORIZATION_HEADER {
+		auth_header = req.Header.Get(LEGACY_AUTHORIZATION_HEADER)
+	}
+
 	if !re_auth.MatchString(auth_header) {
-		slog.Error("Authorization header mismatch", "header", a.authorization_header, "value", auth_header)
+		// Never log the header value since it may contain a (malformed) credential.
+		slog.Error("Authorization header mismatch", "header", a.authorization_header)
 		return nil, fmt.Errorf("Invalid auth header")
 	}
 

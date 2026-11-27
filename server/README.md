@@ -1,4 +1,4 @@
-# go-http/v3/server
+# go-http/v4/server
 
 Go package to provide interfaces and implementation for HTTP servers.
 
@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/aaronland/go-http/v3/server"
+	"github.com/aaronland/go-http/v4/server"
 )
 
 func NewHandler() http.Handler {

@@ -1,4 +1,4 @@
-# go-http/v3/rewrite
+# go-http/v4/rewrite
 
 Go package for creating `net/http` middleware handlers to alter the contents of other (`net/http`) handlers.
 

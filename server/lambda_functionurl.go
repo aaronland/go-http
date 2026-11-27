@@ -75,7 +75,7 @@ func (s *LambdaFunctionURLServer) handleRequest(ctx context.Context, request eve
 	req, err := newHTTPRequest(ctx, request)
 
 	if err != nil {
-		return events.LambdaFunctionURLResponse{Body: err.Error(), StatusCode: 500}, nil
+		return events.LambdaFunctionURLResponse{Body: "Bad Request", StatusCode: 400}, nil
 	}
 
 	rec := httptest.NewRecorder()
@@ -86,12 +86,20 @@ func (s *LambdaFunctionURLServer) handleRequest(ctx context.Context, request eve
 	event_rsp_headers := make(map[string]string)
 
 	for k, v := range rsp.Header {
+
+		// Set-Cookie values can't be safely joined (Expires attributes contain commas)
+		// so they are passed using the dedicated Cookies field.
+		if http.CanonicalHeaderKey(k) == "Set-Cookie" {
+			continue
+		}
+
 		event_rsp_headers[k] = strings.Join(v, ",")
 	}
 
 	event_rsp := events.LambdaFunctionURLResponse{
 		StatusCode: rsp.StatusCode,
 		Headers:    event_rsp_headers,
+		Cookies:    rsp.Header.Values("Set-Cookie"),
 	}
 
 	content_type := rsp.Header.Get("Content-Type")

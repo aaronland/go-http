@@ -1,4 +1,4 @@
-# go-http/v3/cookie
+# go-http/v4/cookie
 
 Go package for working with HTTP cookies.
 
@@ -11,7 +11,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/aaronland/go-http/v3/cookie"	
+	"github.com/aaronland/go-http/v4/cookie"	
 )
 
 func main() {

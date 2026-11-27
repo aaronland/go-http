@@ -34,7 +34,8 @@ func StaticAssetsHandlerWithPrefix(static_fs fs.FS, prefix string) (http.Handler
 	}
 
 	rewrite_func := func(req *http.Request) (*http.Request, error) {
-		req.URL.Path = strings.Replace(req.URL.Path, prefix, "", 1)
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, prefix)
+		req.URL.RawPath = ""
 		return req, nil
 	}
 
@@ -53,7 +54,7 @@ func AppendStaticAssetHandlersWithPrefix(mux *http.ServeMux, static_fs fs.FS, pr
 	asset_handler, err := StaticAssetsHandlerWithPrefix(static_fs, prefix)
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	walk_func := func(path string, info fs.DirEntry, err error) error {

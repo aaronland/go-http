@@ -15,8 +15,8 @@ type RewriteHTMLFunc func(node *html.Node, writer io.Writer)
 
 // RewriteHTMLHandler returns a `net/http` middleware handler to alter the body of 'previous_handler'
 // using 'rewrite_func'. Content is only altered if and when the "Content-Type" header (returned by
-// 'previous_handler') is "text/html". If not, the unaltered body is returned as-is. Redirects
-// are passed along as a 303 redirect.
+// 'previous_handler') is "text/html". If not, the unaltered body (and status code) is returned as-is. Redirects
+// are passed along using their original 3xx status code (or 303 if the status code is not a redirect).
 func RewriteHTMLHandler(previous_handler go_http.Handler, rewrite_func RewriteHTMLFunc) go_http.Handler {
 
 	fn := func(rsp go_http.ResponseWriter, req *go_http.Request) {
@@ -40,11 +40,17 @@ func RewriteHTMLHandler(previous_handler go_http.Handler, rewrite_func RewriteHT
 				}
 
 				for _, vv := range v {
-					rsp.Header().Set(k, vv)
+					rsp.Header().Add(k, vv)
 				}
 			}
 
-			go_http.Redirect(rsp, req, location, 303)
+			status := prev_rsp.StatusCode
+
+			if status < 300 || status > 399 {
+				status = go_http.StatusSeeOther
+			}
+
+			go_http.Redirect(rsp, req, location, status)
 			return
 		}
 
@@ -54,14 +60,16 @@ func RewriteHTMLHandler(previous_handler go_http.Handler, rewrite_func RewriteHT
 
 			parts := strings.Split(content_type, ";")
 
-			if parts[0] != "text/html" {
+			if strings.ToLower(strings.TrimSpace(parts[0])) != "text/html" {
 
 				for k, v := range prev_headers {
 
 					for _, vv := range v {
-						rsp.Header().Set(k, vv)
+						rsp.Header().Add(k, vv)
 					}
 				}
+
+				rsp.WriteHeader(prev_rsp.StatusCode)
 
 				_, err := io.Copy(rsp, prev_rsp.Body)
 

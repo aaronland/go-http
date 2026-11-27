@@ -163,7 +163,12 @@ func (c *EncryptedCookie) SetString(rsp http.ResponseWriter, value string) error
 // Set assigns 'buf' as an encrypted string to a cookie associated with 'c' to 'rsp'.
 func (c *EncryptedCookie) Set(rsp http.ResponseWriter, buf *memguard.LockedBuffer) error {
 
-	http_cookie := &http.Cookie{}
+	http_cookie := &http.Cookie{
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
+
 	return c.SetWithCookie(rsp, buf, http_cookie)
 }
 
@@ -205,13 +210,16 @@ func (c *EncryptedCookie) SetWithCookie(rsp http.ResponseWriter, buf *memguard.L
 	return nil
 }
 
-// Delete removes the cookie associated with 'c' from 'rsp'.
+// Delete removes the cookie associated with 'c' from 'rsp'. The expiring cookie uses the path "/" so it will only clear
+// cookies that were assigned using `Set` or `SetString` (or a `http.Cookie` with the same path).
 func (c *EncryptedCookie) Delete(rsp http.ResponseWriter) error {
 
 	http_cookie := http.Cookie{
-		Name:   c.name,
-		Value:  "",
-		MaxAge: -1,
+		Name:     c.name,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
 	}
 
 	http.SetCookie(rsp, &http_cookie)

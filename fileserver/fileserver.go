@@ -36,7 +36,7 @@ func NewContentTypeHandler(opts *ContentTypeOptions, next http.Handler) (http.Ha
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {
 
-		uri := req.RequestURI
+		uri := req.URL.Path
 		ext := filepath.Ext(uri)
 
 		for re_ext, content_type := range opts.Matches {

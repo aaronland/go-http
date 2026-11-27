@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -391,7 +392,9 @@ func (a *OIDCAuthenticator) callback(rsp http.ResponseWriter, req *http.Request)
 	}
 
 	if e := q.Get("error"); e != "" {
-		http.Error(rsp, "Sign-in failed: "+e, http.StatusForbidden)
+		// Don't reflect the provider-supplied (attacker controlled) value back to the client.
+		slog.Error("OIDC sign-in failed", "error", e)
+		http.Error(rsp, "Sign-in failed", http.StatusForbidden)
 		return
 	}
 

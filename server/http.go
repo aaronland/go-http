@@ -55,6 +55,7 @@ func NewHTTPServer(ctx context.Context, uri string) (Server, error) {
 		return nil, err
 	}
 
+	is_https := u.Scheme == "https"
 	u.Scheme = "http"
 
 	read_timeout := 2 * time.Second
@@ -108,8 +109,17 @@ func NewHTTPServer(ctx context.Context, uri string) (Server, error) {
 		header_timeout = time.Duration(to) * time.Second
 	}
 
-	tls_cert := q.Get("cert")
-	tls_key := q.Get("key")
+	// Accept both the documented (tls_cert, tls_key) and the legacy (cert, key) parameter names.
+	tls_cert := q.Get("tls_cert")
+	tls_key := q.Get("tls_key")
+
+	if tls_cert == "" {
+		tls_cert = q.Get("cert")
+	}
+
+	if tls_key == "" {
+		tls_key = q.Get("key")
+	}
 
 	if (tls_cert != "") && (tls_key != "") {
 
@@ -129,10 +139,10 @@ func NewHTTPServer(ctx context.Context, uri string) (Server, error) {
 
 	} else if (tls_cert != "") && (tls_key == "") {
 		return nil, errors.New("Missing TLS key parameter")
-	} else if (tls_key != "") && (tls_key == "") {
+	} else if (tls_key != "") && (tls_cert == "") {
 		return nil, errors.New("Missing TLS cert parameter")
-	} else {
-		// pass
+	} else if is_https {
+		return nil, errors.New("Missing TLS cert and key parameters")
 	}
 
 	srv := &http.Server{

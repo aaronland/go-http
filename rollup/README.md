@@ -1,4 +1,4 @@
-# go-http/v3/rollup
+# go-http/v4/rollup
 
 Go middleware package for "rolling up" (bundling and minifying) JavaScript and CSS assets.
 

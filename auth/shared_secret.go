@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -84,7 +85,7 @@ func (a *SharedSecretAuthenticator) GetAccountForRequest(req *http.Request) (Acc
 
 	secret := req.Header.Get(SHARED_SECRET_HEADER)
 
-	if secret != a.secret {
+	if secret == "" || subtle.ConstantTimeCompare([]byte(secret), []byte(a.secret)) != 1 {
 		return nil, NotAuthorized{}
 	}
 

@@ -44,7 +44,13 @@ func NewMkCertServer(ctx context.Context, uri string) (Server, error) {
 
 	if root == "" {
 
-		root = os.TempDir()
+		// Use a private (0700) directory rather than the shared temp directory
+		// so other local users can't pre-create or swap the key file.
+		root, err = os.MkdirTemp("", "mkcert-")
+
+		if err != nil {
+			return nil, err
+		}
 
 	} else {
 
@@ -101,6 +107,10 @@ func mkCert(u *url.URL, root string) (string, string, error) {
 
 	parts := strings.Split(u.Host, ":")
 	host := parts[0]
+
+	if host == "" || strings.HasPrefix(host, "-") || strings.ContainsAny(host, "/\\") {
+		return "", "", fmt.Errorf("Invalid host '%s'", host)
+	}
 
 	cert_fname := fmt.Sprintf("%s-cert.pem", host)
 	key_fname := fmt.Sprintf("%s-key.pem", host)

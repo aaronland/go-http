@@ -95,7 +95,7 @@ func NewConfig(ctx context.Context, uri string) (*Config, error) {
 	}
 
 	if u.Host != "" {
-		cfg.Domain = u.Host
+		cfg.Domain = u.Hostname()
 	}
 
 	if u.Path != "" {
@@ -112,6 +112,7 @@ func (cfg *Config) NewCookie(ctx context.Context, value string) (*http.Cookie, e
 		Name:     cfg.Name,
 		Value:    value,
 		Secure:   cfg.Secure,
+		HttpOnly: true,
 		SameSite: cfg.SameSite,
 	}
 

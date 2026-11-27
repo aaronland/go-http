@@ -1,4 +1,4 @@
-# go-http/v3/sanitize
+# go-http/v4/sanitize
 
 ## See also
 

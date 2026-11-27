@@ -1,10 +1,10 @@
-# go-http-fault
+# go-http/v4/fault
 
 Go package providing a `net/http` handler for logging errors and rendering them to the browser using custom templates.
 
 ## Documentation
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/sfomuseum/go-http-fault.svg)](https://pkg.go.dev/github.com/sfomuseum/go-http-fault)
+[![Go Reference](https://pkg.go.dev/badge/github.com/aaronland/go-http/v4.svg)](https://pkg.go.dev/github.com/aaronland/go-http/v4/fault)
 
 ## Example
 
@@ -14,7 +14,7 @@ import (
        "html/template"
        "log"
 
-       "github.com/sfomuseum/go-http-fault/v2"
+       "github.com/aaronland/go-http/v4/fault"
 )
 
 // Create a custom HTTP handler specific to your application that accepts a `fault.FaultHandler` instance

@@ -1,4 +1,4 @@
-# go-http/v3/fileserver
+# go-http/v4/fileserver
 
 There are many Go HTTP file server tools. This one is mine.
 

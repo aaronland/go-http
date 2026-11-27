@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -124,6 +125,13 @@ func NewEncryptedCrumb(ctx context.Context, uri string) (Crumb, error) {
 
 	if str_ttl == "" {
 		return nil, errors.New("Empty ttl= key")
+	}
+
+	switch len(secret) {
+	case 16, 24, 32:
+		// valid AES key length
+	default:
+		return nil, fmt.Errorf("Invalid secret= key length (%d), must be 16, 24 or 32 bytes", len(secret))
 	}
 
 	ttl, err := strconv.ParseInt(str_ttl, 10, 64)
@@ -274,11 +282,7 @@ func (cr *EncryptedCrumb) crumbBase(req *http.Request, extra ...string) (string,
 
 func (cr *EncryptedCrumb) compareHashes(this_enc string, that_enc string) (bool, error) {
 
-	if len(this_enc) != len(that_enc) {
-		return false, nil
-	}
-
-	match := this_enc == that_enc
+	match := subtle.ConstantTimeCompare([]byte(this_enc), []byte(that_enc)) == 1
 	return match, nil
 }
 
@@ -294,29 +298,22 @@ func (cr *EncryptedCrumb) hashCrumb(raw string) (string, error) {
 	return enc, nil
 }
 
-// https://gist.github.com/manishtpatel/8222606
-// https://github.com/blaskovicz/go-cryptkeeper/blob/master/encrypted_string.go
-
+// encryptCrumb encrypts and authenticates 'text' using AES-GCM so that tampered crumbs are rejected.
 func (cr *EncryptedCrumb) encryptCrumb(text string) (string, error) {
 
-	plaintext := []byte(text)
-	secret := []byte(cr.secret)
-
-	block, err := aes.NewCipher(secret)
+	aead, err := cr.newAEAD()
 
 	if err != nil {
 		return "", err
 	}
 
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+	nonce := make([]byte, aead.NonceSize())
 
-	iv := ciphertext[:aes.BlockSize]
-
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", err
 	}
 
-	cipher.NewCFBEncrypter(block, iv).XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	ciphertext := aead.Seal(nonce, nonce, []byte(text), nil)
 
 	return hex.EncodeToString(ciphertext), nil
 }
@@ -329,20 +326,35 @@ func (cr *EncryptedCrumb) decryptCrumb(enc_crumb string) (string, error) {
 		return "", err
 	}
 
-	secret := []byte(cr.secret)
-	block, err := aes.NewCipher(secret)
+	aead, err := cr.newAEAD()
 
 	if err != nil {
 		return "", err
 	}
 
-	if byteLen := len(ciphertext); byteLen < aes.BlockSize {
-		return "", fmt.Errorf("invalid cipher size %d.", byteLen)
+	if byteLen := len(ciphertext); byteLen < aead.NonceSize() {
+		return "", fmt.Errorf("invalid cipher size %d", byteLen)
 	}
 
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
+	nonce := ciphertext[:aead.NonceSize()]
+	ciphertext = ciphertext[aead.NonceSize():]
 
-	cipher.NewCFBDecrypter(block, iv).XORKeyStream(ciphertext, ciphertext)
-	return string(ciphertext), nil
+	plaintext, err := aead.Open(nil, nonce, ciphertext, nil)
+
+	if err != nil {
+		return "", errors.New("Invalid crumb")
+	}
+
+	return string(plaintext), nil
+}
+
+func (cr *EncryptedCrumb) newAEAD() (cipher.AEAD, error) {
+
+	block, err := aes.NewCipher([]byte(cr.secret))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return cipher.NewGCM(block)
 }
