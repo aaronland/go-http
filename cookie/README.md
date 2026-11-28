@@ -2,6 +2,14 @@
 
 Go package for working with HTTP cookies.
 
+The `Cookie` interface reads, writes and deletes cookies (as strings or as `memguard.LockedBuffer` values). Implementations register a URI scheme and are created with `NewCookie`. The `Config` type (created by `NewConfig`) derives cookie attributes (name, domain, path, `Secure`, `SameSite` and TTL) from a URI.
+
+## Schemes
+
+### encrypted://?name={NAME}&secret={SECRET}&salt={SALT}
+
+Cookies whose values are encrypted and authenticated using [NaCl secretbox](https://godoc.org/golang.org/x/crypto/nacl/secretbox). The `secret` must be exactly 32 bytes. `NewRandomEncryptedCookieURI` will generate a URI with random values.
+
 ## Example
 
 _Error handling omitted for the sake of brevity._

@@ -1,6 +1,7 @@
 package fault
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -46,15 +47,82 @@ func TemplatedFaultHandlerWrapper(l *log.Logger, t *template.Template, h http.Ha
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {
 
-		sw := NewStatusWriter(rsp)
-		h.ServeHTTP(sw, req)
+		iw := &interceptWriter{ResponseWriter: rsp}
+		h.ServeHTTP(iw, req)
 
-		if sw.Status < http.StatusBadRequest {
+		if !iw.intercepted {
 			return
+		}
+
+		// The inner handler's error response was discarded; remove headers describing its body.
+		hdr := rsp.Header()
+		hdr.Del("Content-Length")
+		hdr.Del("Content-Encoding")
+		hdr.Del("Etag")
+		hdr.Del("Last-Modified")
+
+		// If the inner handler recorded no error, report its status code.
+		_, ok := req.Context().Value(statusContextKey).(int)
+
+		if !ok {
+			AssignError(req, fmt.Errorf("%s", http.StatusText(iw.status)), iw.status)
 		}
 
 		fh.ServeHTTP(rsp, req)
 	}
 
 	return http.HandlerFunc(fn)
+}
+
+// interceptWriter passes responses with a status below 400 through and discards the status and body of
+// any others so that the fault handler can write the response instead.
+type interceptWriter struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+	intercepted bool
+}
+
+func (w *interceptWriter) WriteHeader(status int) {
+
+	if w.wroteHeader {
+		return
+	}
+
+	w.wroteHeader = true
+	w.status = status
+
+	if status >= http.StatusBadRequest {
+		w.intercepted = true
+		return
+	}
+
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *interceptWriter) Write(b []byte) (int, error) {
+
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	if w.intercepted {
+		return len(b), nil
+	}
+
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *interceptWriter) Flush() {
+
+	if w.intercepted {
+		return
+	}
+
+	f, ok := w.ResponseWriter.(http.Flusher)
+
+	if ok {
+		w.wroteHeader = true
+		f.Flush()
+	}
 }

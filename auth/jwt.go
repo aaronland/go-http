@@ -55,7 +55,7 @@ type JWTAuthenticator struct {
 //	jwt://runtimevar?runtimevar-uri={GOCLOUD_DEV_RUNTIMEVAR_URI}
 //
 // Where {GOCLOUD_DEV_RUNTIMEVAR_URI} is a valid `gocloud.dev/runtimevar` URI used to dereference the JWT signing secret.
-// Under the hood this method uses the `github.com/sfomuseum/runtimevar.StringVar` method to dereference runtimevar URIs.
+// Under the hood this method uses the `github.com/aaronland/gocloud/runtimevar.StringVar` method to dereference runtimevar URIs.
 //
 // By default a `JWTAuthenticator` instance looks for JWT Bearer tokens in the HTTP "Authorization" header (falling back to the legacy "Authentication" header). This behaviour
 // can be customized by passing an "authorization-header" query parameter in 'uri'. For example:

@@ -9,7 +9,9 @@ import (
 // StatusWriter type adds a `Status` property to Go's `http.ResponseWriter` type.
 type StatusWriter struct {
 	http.ResponseWriter
-	Status int
+	// Status is the status code that was sent to the client: the first one written, or `http.StatusOK`.
+	Status      int
+	wroteHeader bool
 }
 
 // NewStatusWriter returns a new `StatusWriter` wrapping 'w'. It is intended for middleware
@@ -30,8 +32,36 @@ func NewStatusWriter(w http.ResponseWriter) *StatusWriter {
 	}
 }
 
-// WriteHeader records 'status' and then calls the underlying `http.ResponseWriter`'s `WriteHeader` method.
+// WriteHeader records 'status' (only the first call counts, as that is what the client sees) and then
+// calls the underlying `http.ResponseWriter`'s `WriteHeader` method.
 func (w *StatusWriter) WriteHeader(status int) {
-	w.Status = status
+
+	if !w.wroteHeader {
+		w.Status = status
+		w.wroteHeader = true
+	}
+
 	w.ResponseWriter.WriteHeader(status)
+}
+
+// Write marks the status as sent (an implicit 200) and writes to the underlying `http.ResponseWriter`.
+func (w *StatusWriter) Write(b []byte) (int, error) {
+	w.wroteHeader = true
+	return w.ResponseWriter.Write(b)
+}
+
+// Flush calls the underlying writer's `Flush` method, if it has one.
+func (w *StatusWriter) Flush() {
+
+	f, ok := w.ResponseWriter.(http.Flusher)
+
+	if ok {
+		w.wroteHeader = true
+		f.Flush()
+	}
+}
+
+// Unwrap returns the underlying `http.ResponseWriter` for use with `http.ResponseController`.
+func (w *StatusWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }

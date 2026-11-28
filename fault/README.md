@@ -108,3 +108,13 @@ Finally create the fault handler using the `FaultHandlerWithOptions` method. For
 ```
 handler := fault.FaultHandlerWithOptions(opts)
 ```
+
+## Behaviour
+
+- The response carries the status code passed to `fault.AssignError` (or `500` if it is outside `100`-`999`). Templates are rendered into a buffer first, so a failing template never produces a partial page; a plain-text response is sent instead. Templated responses are `text/html; charset=utf-8` with `X-Content-Type-Options: nosniff`.
+- Errors that implement `fault.FaultError` have a `Public()` error (passed to the template) and a `Private()` error (logged only). Any other error is used for both. Set `FaultHandlerOptions.GenericPublicErrors` to pass `http.StatusText(status)` to templates for those errors instead, so internal error text is never rendered.
+- A nil `Logger` falls back to `log.Default()`; set `SlogLogger` to log with `log/slog` instead. Log lines contain the quoted method and URL path (never the query string).
+- A nil `VarsFunc` falls back to `fault.FaultHandlerVars`. Custom vars may either have settable `Status int` and `Error error` fields, or implement `fault.FaultHandlerVarsSetter`. Pointers returned by `VarsFunc` are copied before being populated, so sharing one across requests is safe.
+- `TemplatedFaultHandlerWrapper` / `FaultWrapper` discard the body and status written by the wrapped handler when it responds with `>= 400` and serve the fault page instead. If the handler did not call `fault.AssignError` the status text is used as the error.
+- `fault.ErrorKey` and `fault.StatusKey` are deprecated. Values are stored under private typed context keys (and, for compatibility, the legacy string keys); use `AssignError` and `RetrieveError`. Note that `AssignError` replaces `*req` in place.
+- `StatusWriter` records the first status written and supports `http.ResponseController` (`Unwrap`) and `http.Flusher`.
