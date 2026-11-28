@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -13,6 +15,10 @@ func tagHandler(tag string) RouteHandlerFunc {
 			rsp.Write([]byte(tag))
 		}), nil
 	}
+}
+
+func anchored(handlers map[string]RouteHandlerFunc) (http.Handler, error) {
+	return RouteHandlerWithOptions(&RouteHandlerOptions{Handlers: handlers, EndAnchored: true})
 }
 
 func serve(t *testing.T, h http.Handler, method string, host string, path string) *httptest.ResponseRecorder {
@@ -129,7 +135,7 @@ func TestRoutePathValues(t *testing.T) {
 func TestRouteLongestPatternWins(t *testing.T) {
 
 	h, err := RouteHandler(map[string]RouteHandlerFunc{
-		"/api":         tagHandler("short"),
+		"/api/":        tagHandler("short"),
 		"/api/special": tagHandler("long"),
 	})
 
@@ -137,7 +143,7 @@ func TestRouteLongestPatternWins(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if rsp := serve(t, h, "GET", "", "/api/special/x"); rsp.Body.String() != "long" {
+	if rsp := serve(t, h, "GET", "", "/api/special"); rsp.Body.String() != "long" {
 		t.Fatalf("got %q", rsp.Body.String())
 	}
 
@@ -146,24 +152,247 @@ func TestRouteLongestPatternWins(t *testing.T) {
 	}
 }
 
-// Patterns are matched as string prefixes, not path segments. This test pins that behaviour
-// so a change to it is a conscious one.
-func TestRoutePrefixMatchingIsNotSegmentAware(t *testing.T) {
+// A pattern without a trailing slash is an exact match, one with it is a subtree. Matching is by
+// path segment so "/admin" can never capture "/administrator".
+func TestRouteExactAndSubtree(t *testing.T) {
 
-	h, err := RouteHandler(map[string]RouteHandlerFunc{
-		"/admin": tagHandler("admin"),
+	h, err := anchored(map[string]RouteHandlerFunc{
+		"/admin":  tagHandler("exact"),
+		"/files/": tagHandler("subtree"),
+		"/{$}":    tagHandler("root"),
 	})
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if rsp := serve(t, h, "GET", "", "/admin/users"); rsp.Code != 200 {
-		t.Fatalf("expected /admin/users to match, got %d", rsp.Code)
+	tests := map[string]struct {
+		code int
+		body string
+	}{
+		"/admin":         {200, "exact"},
+		"/admin/users":   {404, ""},
+		"/administrator": {404, ""},
+		"/files/":        {200, "subtree"},
+		"/files/a/b":     {200, "subtree"},
+		"/filesystem":    {404, ""},
+		"/":              {200, "root"},
+		"/other":         {404, ""},
 	}
 
-	if rsp := serve(t, h, "GET", "", "/administrator"); rsp.Code != 200 {
-		t.Fatalf("/administrator no longer matches /admin (got %d); update this test and the docs if that is intended", rsp.Code)
+	for path, want := range tests {
+
+		rsp := serve(t, h, "GET", "", path)
+
+		if rsp.Code != want.code || (want.body != "" && rsp.Body.String() != want.body) {
+			t.Errorf("%s: got %d %q, want %d %q", path, rsp.Code, rsp.Body.String(), want.code, want.body)
+		}
+	}
+}
+
+func TestRouteSamePathDifferentMethods(t *testing.T) {
+
+	h, err := RouteHandler(map[string]RouteHandlerFunc{
+		"GET /a/{id}":    tagHandler("get"),
+		"POST /a/{id}":   tagHandler("post"),
+		"PATCH /p":       tagHandler("patch"),
+		"OPTIONS /o":     tagHandler("options"),
+		"DELETE /a/{id}": tagHandler("delete"),
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct{ method, path, body string }{
+		{"GET", "/a/1", "get"},
+		{"HEAD", "/a/1", ""},
+		{"POST", "/a/1", "post"},
+		{"DELETE", "/a/1", "delete"},
+		{"PATCH", "/p", "patch"},
+		{"OPTIONS", "/o", "options"},
+	} {
+
+		rsp := serve(t, h, tc.method, "", tc.path)
+
+		if rsp.Code != 200 || (tc.method != "HEAD" && rsp.Body.String() != tc.body) {
+			t.Errorf("%s %s: got %d %q", tc.method, tc.path, rsp.Code, rsp.Body.String())
+		}
+	}
+
+	rsp := serve(t, h, "PUT", "", "/a/1")
+
+	if rsp.Code != 405 || rsp.Header().Get("Allow") != "DELETE, GET, HEAD, POST" {
+		t.Errorf("got %d Allow=%q", rsp.Code, rsp.Header().Get("Allow"))
+	}
+
+	if rsp := serve(t, h, "GET", "", "/nope"); rsp.Code != 404 {
+		t.Errorf("got %d", rsp.Code)
+	}
+}
+
+func TestRouteSpecificity(t *testing.T) {
+
+	h, err := anchored(map[string]RouteHandlerFunc{
+		"/id/{id}":      tagHandler("wild"),
+		"/id/abc":       tagHandler("literal"),
+		"/id/{rest...}": tagHandler("rest"),
+		"/x/{a}/{b}":    tagHandler("ab"),
+		"/x/{a}/fixed":  tagHandler("a-fixed"),
+		"example.com/h": tagHandler("host"),
+		"/h":            tagHandler("nohost"),
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Run repeatedly: ordering must not depend on map iteration.
+	for i := 0; i < 50; i++ {
+
+		for path, want := range map[string]string{
+			"/id/abc":    "literal",
+			"/id/other":  "wild",
+			"/id/a/b":    "rest",
+			"/x/1/fixed": "a-fixed",
+			"/x/1/2":     "ab",
+		} {
+
+			if rsp := serve(t, h, "GET", "", path); rsp.Body.String() != want {
+				t.Fatalf("%s: got %q, want %q", path, rsp.Body.String(), want)
+			}
+		}
+
+		if rsp := serve(t, h, "GET", "example.com:8080", "/h"); rsp.Body.String() != "host" {
+			t.Fatalf("got %q", rsp.Body.String())
+		}
+
+		if rsp := serve(t, h, "GET", "other.com", "/h"); rsp.Body.String() != "nohost" {
+			t.Fatalf("got %q", rsp.Body.String())
+		}
+	}
+}
+
+func TestRouteEscapedSlashStaysInSegment(t *testing.T) {
+
+	var got string
+
+	h, _ := anchored(map[string]RouteHandlerFunc{
+		"/u/{id}": func(ctx context.Context) (http.Handler, error) {
+			return http.HandlerFunc(func(rsp http.ResponseWriter, req *http.Request) {
+				got = req.PathValue("id")
+			}), nil
+		},
+	})
+
+	if rsp := serve(t, h, "GET", "", "/u/a%2Fb"); rsp.Code != 200 || got != "a/b" {
+		t.Fatalf("got %d %q", rsp.Code, got)
+	}
+
+	if rsp := serve(t, h, "GET", "", "/u/a/b"); rsp.Code != 404 {
+		t.Fatalf("got %d", rsp.Code)
+	}
+}
+
+func TestRouteRestWildcard(t *testing.T) {
+
+	var got string
+
+	h, _ := RouteHandler(map[string]RouteHandlerFunc{
+		"/files/{path...}": func(ctx context.Context) (http.Handler, error) {
+			return http.HandlerFunc(func(rsp http.ResponseWriter, req *http.Request) {
+				got = req.PathValue("path")
+			}), nil
+		},
+	})
+
+	if rsp := serve(t, h, "GET", "", "/files/a/b.txt"); rsp.Code != 200 || got != "a/b.txt" {
+		t.Fatalf("got %d %q", rsp.Code, got)
+	}
+}
+
+func TestRouteInvalidPatterns(t *testing.T) {
+
+	for _, p := range []string{
+		"foo",
+		"FETCH /x",
+		"/x/{",
+		"/x/}",
+		"/x/{}",
+		"/x/a{id}",
+		"/x/{id}b",
+		"/x/{a}/{a}",
+		"/x/{rest...}/more",
+		"/x/{$}/more",
+	} {
+		if _, err := RouteHandler(map[string]RouteHandlerFunc{p: tagHandler("x")}); err == nil {
+			t.Errorf("expected an error for pattern %q", p)
+		}
+	}
+
+	if _, err := RouteHandler(map[string]RouteHandlerFunc{"/x": nil}); err == nil {
+		t.Error("expected an error for a nil handler func")
+	}
+
+	if _, err := RouteHandlerWithOptions(nil); err == nil {
+		t.Error("expected an error for nil options")
+	}
+}
+
+func TestRouteNilHandlerIs500(t *testing.T) {
+
+	h, _ := RouteHandler(map[string]RouteHandlerFunc{
+		"/nil": func(ctx context.Context) (http.Handler, error) { return nil, nil },
+	})
+
+	if rsp := serve(t, h, "GET", "", "/nil"); rsp.Code != 500 {
+		t.Fatalf("got %d", rsp.Code)
+	}
+}
+
+// The handler is built once even under concurrent first requests, and a failed build is retried.
+func TestRouteHandlerInitializedOnce(t *testing.T) {
+
+	var calls atomic.Int32
+	var fail atomic.Bool
+	fail.Store(true)
+
+	h, _ := RouteHandler(map[string]RouteHandlerFunc{
+		"/once": func(ctx context.Context) (http.Handler, error) {
+			calls.Add(1)
+
+			if fail.Load() {
+				return nil, http.ErrAbortHandler
+			}
+
+			return tagHandler("ok")(ctx)
+		},
+	})
+
+	if rsp := serve(t, h, "GET", "", "/once"); rsp.Code != 500 {
+		t.Fatalf("got %d", rsp.Code)
+	}
+
+	fail.Store(false)
+	calls.Store(0)
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			if rsp := serve(t, h, "GET", "", "/once"); rsp.Code != 200 {
+				t.Errorf("got %d", rsp.Code)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if n := calls.Load(); n != 1 {
+		t.Fatalf("handler built %d times", n)
 	}
 }
 
@@ -181,5 +410,49 @@ func TestRouteHandlerFactoryError(t *testing.T) {
 
 	if rsp := serve(t, h, "GET", "", "/broken"); rsp.Code != 500 {
 		t.Fatalf("expected 500, got %d", rsp.Code)
+	}
+}
+
+// The default is to match by prefix, as earlier versions did.
+func TestRouteDefaultIsPrefixMatching(t *testing.T) {
+
+	h, err := RouteHandler(map[string]RouteHandlerFunc{
+		"/admin":         tagHandler("admin"),
+		"/id/{id}":       tagHandler("id"),
+		"POST /foo/post": tagHandler("post"),
+		"/foo":           tagHandler("foo"),
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for path, want := range map[string]int{
+		"/admin":         200,
+		"/admin/users":   200,
+		"/administrator": 200,
+		"/id/1/extra":    200,
+		"/foo/":          200,
+		"/foo/other":     200,
+		"/nope":          404,
+	} {
+		if rsp := serve(t, h, "GET", "", path); rsp.Code != want {
+			t.Errorf("%s: got %d, want %d", path, rsp.Code, want)
+		}
+	}
+
+	// A method mismatch on the most specific pattern is a 405, not a fallback to "/foo".
+	if rsp := serve(t, h, "GET", "", "/foo/post"); rsp.Code != 405 {
+		t.Errorf("got %d", rsp.Code)
+	}
+
+	// Longer patterns still win over shorter prefixes.
+	h2, _ := RouteHandler(map[string]RouteHandlerFunc{
+		"/admin":         tagHandler("short"),
+		"/administrator": tagHandler("long"),
+	})
+
+	if rsp := serve(t, h2, "GET", "", "/administrator/x"); rsp.Body.String() != "long" {
+		t.Errorf("got %q", rsp.Body.String())
 	}
 }

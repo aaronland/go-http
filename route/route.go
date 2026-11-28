@@ -6,41 +6,37 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
-// Regular expression to match "{label}" style substitutions in URL patterns
+// Regular expression to match "{label}" style wildcards in URL patterns.
 var re_braces = regexp.MustCompile(`\{([^\}]+)\}`)
 
-// Regular expression to match Go 1.22 "[METHOD] [HOST]/[PATH]" URL definitions. This is probably
-// not as robust as it could be.
-var re_route = regexp.MustCompile(`^(?:(?:(GET|POST|PUT|HEAD|OPTION|DELETE)\s)?([^\/]+)?)?(.*)$`)
+// Regular expression to match Go 1.22 "[METHOD ][HOST]/[PATH]" URL patterns.
+var re_route = regexp.MustCompile(`^(?:([A-Z]+)\s+)?([^/\s]*)(/.*)$`)
 
-var re_mutex = new(sync.RWMutex)
-
-// not_a_slash returns the regular expression "([^\/]+)" used to replace "{label}" style strings in URL patterns.
-func not_a_slash(s string) string {
-	return `([^\/]+)`
+var valid_methods = map[string]bool{
+	http.MethodGet:     true,
+	http.MethodHead:    true,
+	http.MethodPost:    true,
+	http.MethodPut:     true,
+	http.MethodPatch:   true,
+	http.MethodDelete:  true,
+	http.MethodOptions: true,
+	http.MethodConnect: true,
+	http.MethodTrace:   true,
 }
 
-// Local cache of wildcard regular expressions that have been derived from patterns with "{label}" style substitutions
-var wildcard_matches = make(map[string]*regexp.Regexp)
-
-// Local struct for return key value pairs that have been derived from URL with "{label}" style substitutions
-// and their subsequent wildcard matches
-type pathValue struct {
-	Key   string
-	Value string
-}
-
-// String returns the key and value pair in a pathValue as a "key=value" formatted string.
-func (pv *pathValue) String() string {
-	return fmt.Sprintf("%s=%s", pv.Key, pv.Value)
-}
+// slash_placeholder stands in for an escaped slash ("%2F") inside a path segment so that a wildcard
+// does not match across segments. It can never appear in a pattern.
+const slash_placeholder = "\x00"
 
 // RouteHandlerFunc returns an `http.Handler` instance.
 type RouteHandlerFunc func(context.Context) (http.Handler, error)
@@ -51,6 +47,11 @@ type RouteHandlerOptions struct {
 	// Handlers is a map whose keys are `http.ServeMux` style routing patterns and whose values
 	// are functions that when invoked return `http.Handler` instances.
 	Handlers map[string]RouteHandlerFunc
+	// EndAnchored, if true, makes patterns match like `http.ServeMux` does: a pattern that does not end
+	// in a slash matches only that exact path and one that ends in a slash matches that path and everything
+	// beneath it. If false (the default) a pattern matches any path that begins with it, so "/admin" will
+	// also match "/admin/users" and "/administrator".
+	EndAnchored bool
 }
 
 // RouteHandler creates a new `http.Handler` instance that will serve requests using handlers defined in 'handlers'.
@@ -63,10 +64,65 @@ func RouteHandler(handlers map[string]RouteHandlerFunc) (http.Handler, error) {
 	return RouteHandlerWithOptions(opts)
 }
 
+// route is a single parsed pattern and its lazily initialized handler.
+type route struct {
+	pattern string
+	method  string
+	host    string
+	re      *regexp.Regexp
+	keys    []string
+	ranks   []int
+	path    string
+	pathLen int
+	factory RouteHandlerFunc
+
+	mu      sync.Mutex
+	handler atomic.Pointer[http.Handler]
+}
+
+// get returns the route's handler, initializing it on first use. A failed initialization is not cached.
+func (r *route) get(ctx context.Context) (http.Handler, error) {
+
+	if h := r.handler.Load(); h != nil {
+		return *h, nil
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if h := r.handler.Load(); h != nil {
+		return *h, nil
+	}
+
+	// A canceled first request must not poison the handler that every later request will share.
+	h, err := r.factory(context.WithoutCancel(ctx))
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to instantiate handler func for '%s', %w", r.pattern, err)
+	}
+
+	if h == nil {
+		return nil, fmt.Errorf("Handler func for '%s' returned a nil handler", r.pattern)
+	}
+
+	r.handler.Store(&h)
+	return h, nil
+}
+
+// allows returns true if a request using 'method' may be served by the route. A "GET" route also serves "HEAD".
+func (r *route) allows(method string) bool {
+
+	if r.method == "" || r.method == method {
+		return true
+	}
+
+	return r.method == http.MethodGet && method == http.MethodHead
+}
+
 // RouteHandlerWithOptions creates a new `http.Handler` instance that will serve requests using handlers defined
 // in 'opts.Handlers'. This is essentially a "middleware" handler that does all the same routing that the default
 // `http.ServeMux` handler does but defers initiating the handlers being routed to until they are invoked at runtime.
-// Only one handler is initialized (or retrieved from an in-memory cache) and served for any given request path.
+// Only one handler is initialized (and then cached) for any given pattern.
 //
 // The reason this handler exists is for web applications that:
 //
@@ -75,238 +131,354 @@ func RouteHandler(handlers map[string]RouteHandlerFunc) (http.Handler, error) {
 //  2. You don't want to refactor in to (n) atomic Lambda functions. That is you want to be able to re-use the same
 //     code in both a plain-vanilla HTTP server configuration as well as Lambda + API Gateway configuration.
 //
-// URL patterns for handlers (passed in the `RouteHandlerOptions` struct) are parsed using a custom implementation
-// of Go 1.22's "URL pattern matching". While this implementation has been tested on common patterns it is likely that
-// there are still edge-cases, or simply sufficiently sophisticated cases, that will not match. This is considered a
-// "known known" and those cases will need to be addressed as they arise. This custom implementation uses regular
-// expressions and has not been benchmarked against the Go 1.22 implementation. I would prefer to use the native
-// implementation but it is a) code that is private to [net/http] and sufficiently involved that cloning it in to this
-// package, and then tracking the changes, seems like a bad idea.
+// Patterns follow Go 1.22's `http.ServeMux` syntax: "[METHOD ][HOST]/[PATH]". By default a pattern matches any
+// path that begins with it. If `RouteHandlerOptions.EndAnchored` is true a pattern that does not end in a
+// slash matches only that exact path, and one that ends in a slash matches that path and everything beneath it.
+// Wildcards are "{name}" (one path segment), "{name...}" (the remainder of the path, final segment only) and
+// "{$}" (the end of the path, final segment only). A "GET" pattern also matches "HEAD" requests.
+//
+// When more than one pattern matches a request the most specific one wins: patterns with a host beat those
+// without, literal segments beat wildcards and longer patterns beat shorter ones. If a path matches only patterns
+// restricted to other methods the response is a 405 with an "Allow" header. This is a regular expression based
+// implementation, not a clone of the one in [net/http], so unusual patterns may behave differently. Patterns are
+// parsed and validated once, when the handler is created, and an invalid pattern is returned as an error.
 func RouteHandlerWithOptions(opts *RouteHandlerOptions) (http.Handler, error) {
 
-	matches := new(sync.Map)
-	patterns := make([]string, 0)
-
-	for p := range opts.Handlers {
-		patterns = append(patterns, p)
+	if opts == nil {
+		return nil, fmt.Errorf("Missing options")
 	}
 
-	// Sort longest to shortest
-	// https://cs.opensource.google/go/go/+/refs/tags/go1.20.4:src/net/http/server.go;l=2533
+	end_anchored := opts.EndAnchored
+	routes := make([]*route, 0, len(opts.Handlers))
 
-	sort.Slice(patterns, func(i, j int) bool {
-		return len(patterns[i]) > len(patterns[j])
+	for pattern, factory := range opts.Handlers {
+
+		if factory == nil {
+			return nil, fmt.Errorf("Missing handler func for pattern '%s'", pattern)
+		}
+
+		r, err := parsePattern(pattern, opts.EndAnchored)
+
+		if err != nil {
+			return nil, fmt.Errorf("Invalid pattern '%s', %w", pattern, err)
+		}
+
+		r.factory = factory
+		routes = append(routes, r)
+	}
+
+	sort.Slice(routes, func(i, j int) bool {
+		return moreSpecific(routes[i], routes[j])
 	})
 
 	fn := func(rsp http.ResponseWriter, req *http.Request) {
 
-		logger := slog.Default()
-		logger = logger.With("path", req.URL.Path)
+		logger := slog.Default().With("path", req.URL.Path)
 
-		derive_rsp, err := deriveHandler(req, opts.Handlers, matches, patterns)
+		path := normalizePath(req)
+		host := stripPort(req.Host)
 
-		if err != nil {
-			logger.Error("Failed to derive handler", "error", err)
-			http.Error(rsp, "Internal server error", http.StatusInternalServerError)
-			return
-		}
+		allowed := make(map[string]bool)
 
-		if derive_rsp == nil {
-			logger.Debug("Route handler not found")
-			http.Error(rsp, "Not found", http.StatusNotFound)
-			return
-		}
+		// Without end anchoring the first (most specific) pattern whose path matches owns the request, so a
+		// method mismatch is a 405 rather than a reason to fall back to a shorter prefix.
+		blocked_path := ""
+		blocked := false
 
-		if derive_rsp.Method != "" && derive_rsp.Method != req.Method {
-			logger.Debug("Invalid method for route handler", "method", req.Method, "require", derive_rsp.Method)
-			http.Error(rsp, "Method not allow", http.StatusMethodNotAllowed)
-			return
-		}
+		for _, r := range routes {
 
-		if derive_rsp.Host != "" && derive_rsp.Host != req.Host {
-			logger.Debug("Invalid host for route handler", "host", req.Host, "require", derive_rsp.Host)
-			http.Error(rsp, "Not found", http.StatusNotFound)
-			return
-		}
-
-		if derive_rsp.PathValues != nil {
-
-			for _, pv := range derive_rsp.PathValues {
-				req.SetPathValue(pv.Key, pv.Value)
+			if r.host != "" && r.host != host {
+				continue
 			}
+
+			m := r.re.FindStringSubmatch(path)
+
+			if m == nil {
+				continue
+			}
+
+			if blocked && r.path != blocked_path {
+				continue
+			}
+
+			if !r.allows(req.Method) {
+
+				if !end_anchored {
+					blocked = true
+					blocked_path = r.path
+				}
+
+				allowed[r.method] = true
+
+				if r.method == http.MethodGet {
+					allowed[http.MethodHead] = true
+				}
+
+				continue
+			}
+
+			h, err := r.get(req.Context())
+
+			if err != nil {
+				logger.Error("Failed to derive handler", "error", err)
+				http.Error(rsp, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			for i, key := range r.keys {
+				req.SetPathValue(key, strings.ReplaceAll(m[i+1], slash_placeholder, "/"))
+			}
+
+			logger.Debug("Serve derived handler", "pattern", r.pattern)
+			h.ServeHTTP(rsp, req)
+			return
 		}
 
-		logger.Debug("Serve derived handler", "pattern", derive_rsp.MatchingPattern, "path values", derive_rsp.PathValues)
-		derive_rsp.Handler.ServeHTTP(rsp, req)
+		if len(allowed) > 0 {
+
+			methods := make([]string, 0, len(allowed))
+
+			for m := range allowed {
+				methods = append(methods, m)
+			}
+
+			sort.Strings(methods)
+
+			logger.Debug("Invalid method for route handler", "method", req.Method, "allow", methods)
+			rsp.Header().Set("Allow", strings.Join(methods, ", "))
+			http.Error(rsp, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		logger.Debug("Route handler not found")
+		http.Error(rsp, "Not found", http.StatusNotFound)
 	}
 
 	return http.HandlerFunc(fn), nil
 }
 
-type deriveHandlerResults struct {
-	MatchingPattern string
-	Handler         http.Handler
-	Method          string
-	Host            string
-	PathValues      []*pathValue
+// parsePattern parses and validates 'pattern' and compiles its path in to a regular expression.
+func parsePattern(pattern string, end_anchored bool) (*route, error) {
+
+	m := re_route.FindStringSubmatch(pattern)
+
+	if m == nil {
+		return nil, fmt.Errorf("Expected [METHOD ][HOST]/[PATH]")
+	}
+
+	method, host, path := m[1], m[2], m[3]
+
+	if method != "" && !valid_methods[method] {
+		return nil, fmt.Errorf("Unknown method '%s'", method)
+	}
+
+	re, keys, err := compilePath(path, end_anchored)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &route{
+		pattern: pattern,
+		method:  method,
+		host:    host,
+		re:      re,
+		keys:    keys,
+		ranks:   segmentRanks(path),
+		path:    path,
+		pathLen: len(path),
+	}, nil
 }
 
-func deriveHandler(req *http.Request, handlers map[string]RouteHandlerFunc, matches *sync.Map, patterns []string) (*deriveHandlerResults, error) {
+// compilePath converts the path portion of a pattern in to a regular expression (anchored at the end if 'end_anchored' is true or the pattern ends in "{$}" or "{name...}") and the
+// ordered list of wildcard names that its capture groups correspond to.
+func compilePath(path string, end_anchored bool) (*regexp.Regexp, []string, error) {
 
-	ctx := req.Context()
-	path := req.URL.Path
+	var sb strings.Builder
+	sb.WriteString("(?s)^")
 
-	// Basically do what the default http.ServeMux does but inflate the
-	// handler (func) on demand at run-time. Handler is cached above.
-	// https://cs.opensource.google/go/go/+/refs/tags/go1.20.4:src/net/http/server.go;l=2363
+	keys := make([]string, 0)
+	seen := make(map[string]bool)
 
-	// That was before Go 1.22 's pattern routing which makes everything more complicated. What
-	// follows is less complicated (or at least less twisty) than the net/http code which is all
-	// private and internal and too much to clone in to this package. What follows may still contain
-	// gotchas.
-	// https://cs.opensource.google/go/go/+/refs/tags/go1.22.0:src/net/http/server.go;l=2320
+	pos := 0
+	open_ended := false
 
-	var matching_pattern string
-	var host string
-	var method string
+	for _, idx := range re_braces.FindAllStringSubmatchIndex(path, -1) {
 
-	var path_values []*pathValue
+		lit := path[pos:idx[0]]
 
-	for _, p := range patterns {
-
-		// Don't let the method and host of a previously evaluated (and non-matching)
-		// pattern leak in to the next one.
-		method = ""
-		host = ""
-
-		// slog.Info("ROUTE", "pattern", p)
-
-		// First just try the simple prefix-based approach
-
-		if strings.HasPrefix(path, p) {
-			matching_pattern = p
-			break
+		if strings.ContainsAny(lit, "{}") {
+			return nil, nil, fmt.Errorf("Unbalanced brace")
 		}
 
-		// Next try to parse out [METHOD] [HOST]/[PATH]
+		next := idx[1]
 
-		route_m := re_route.FindStringSubmatch(p)
-
-		if len(route_m) == 0 {
-			continue
+		if !strings.HasSuffix(lit, "/") || (next < len(path) && path[next] != '/') {
+			return nil, nil, fmt.Errorf("Wildcards must be a whole path segment")
 		}
 
-		method = route_m[1]
-		host = route_m[2]
-		route_path := route_m[3]
+		sb.WriteString(regexp.QuoteMeta(lit))
 
-		// slog.Info("ROUTE", "path", route_path)
+		name := path[idx[2]:idx[3]]
 
-		if !re_braces.MatchString(route_path) {
+		switch {
+		case name == "$":
 
-			if strings.HasPrefix(path, route_path) {
-				matching_pattern = p
-				break
-			} else {
-				continue
+			if next != len(path) {
+				return nil, nil, fmt.Errorf("{$} must be the final segment")
+			}
+
+			open_ended = true
+
+		case strings.HasSuffix(name, "..."):
+
+			if next != len(path) {
+				return nil, nil, fmt.Errorf("{...} wildcards must be the final segment")
+			}
+
+			name = strings.TrimSuffix(name, "...")
+			sb.WriteString("(.*)")
+			open_ended = true
+
+			if err := addKey(&keys, seen, name); err != nil {
+				return nil, nil, err
+			}
+
+		default:
+
+			sb.WriteString("([^/]+)")
+
+			if err := addKey(&keys, seen, name); err != nil {
+				return nil, nil, err
 			}
 		}
 
-		// If there are replace them with a match-up-to-next-forward-slash capture
-		// and then use the result to build a new regular expression
-
-		re_mutex.Lock()
-
-		re_wildcard, exists := wildcard_matches[route_path]
-
-		if !exists {
-
-			str_wildcard := "^" + re_braces.ReplaceAllStringFunc(route_path, not_a_slash)
-			re, err := regexp.Compile(str_wildcard)
-
-			if err != nil {
-				re_mutex.Unlock()
-				return nil, fmt.Errorf("Failed to compile wildcard regexp, %w", err)
-			}
-
-			re_wildcard = re
-			wildcard_matches[route_path] = re_wildcard
-		}
-
-		re_mutex.Unlock()
-
-		// Does the current path (like the actual request being processed) match the wildcard?
-
-		path_m := re_wildcard.FindStringSubmatch(path)
-
-		if len(path_m) == 0 {
-			continue
-		}
-
-		// If it does extract all the curly-substitution braces and then use the two matches
-		// to build a set of key,value pairs to populate the request's PathValue lookup table
-
-		key_m := re_braces.FindAllStringSubmatch(route_path, -1)
-
-		count_k := len(key_m)
-		path_values = make([]*pathValue, count_k)
-
-		for i := range count_k {
-
-			key := key_m[i][1]
-			value := path_m[i+1]
-
-			pv := &pathValue{
-				Key:   key,
-				Value: value,
-			}
-
-			path_values[i] = pv
-		}
-
-		matching_pattern = p
-		break
+		pos = next
 	}
 
-	if matching_pattern == "" {
-		return nil, nil
+	tail := path[pos:]
+
+	if strings.ContainsAny(tail, "{}") {
+		return nil, nil, fmt.Errorf("Unbalanced brace")
 	}
 
-	// slog.Info("ROUTE", "path", path, "matching_pattern", matching_pattern, "pv", path_values)
+	sb.WriteString(regexp.QuoteMeta(tail))
 
-	var handler http.Handler
+	switch {
+	case open_ended || end_anchored:
 
-	v, exists := matches.Load(matching_pattern)
-
-	if exists {
-		handler = v.(http.Handler)
-	} else {
-
-		handler_func, ok := handlers[matching_pattern]
-
-		// Don't fill up the matches cache with 404 handlers
-
-		if !ok {
-			return nil, nil
+		if !open_ended && strings.HasSuffix(path, "/") {
+			sb.WriteString(".*")
 		}
 
-		h, err := handler_func(ctx)
+		sb.WriteString("$")
+	}
+
+	re, err := regexp.Compile(sb.String())
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("Failed to compile wildcard regexp, %w", err)
+	}
+
+	return re, keys, nil
+}
+
+func addKey(keys *[]string, seen map[string]bool, name string) error {
+
+	if name == "" {
+		return fmt.Errorf("Empty wildcard name")
+	}
+
+	if seen[name] {
+		return fmt.Errorf("Duplicate wildcard name '%s'", name)
+	}
+
+	seen[name] = true
+	*keys = append(*keys, name)
+	return nil
+}
+
+// segmentRanks scores each path segment: 2 for a literal (or "{$}"), 1 for "{name}", 0 for "{name...}" and
+// for the open-ended tail of a pattern that ends in a slash.
+func segmentRanks(path string) []int {
+
+	segments := strings.Split(path, "/")
+	ranks := make([]int, len(segments))
+
+	for i, s := range segments {
+
+		switch {
+		case s == "" && i == len(segments)-1 && i > 0:
+			ranks[i] = 0
+		case s == "{$}":
+			ranks[i] = 2
+		case strings.HasPrefix(s, "{") && strings.HasSuffix(s, "...}"):
+			ranks[i] = 0
+		case strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}"):
+			ranks[i] = 1
+		default:
+			ranks[i] = 2
+		}
+	}
+
+	return ranks
+}
+
+// moreSpecific returns true if 'a' should be tried before 'b'. The ordering is total so that routing
+// does not depend on map iteration order.
+func moreSpecific(a, b *route) bool {
+
+	if (a.host != "") != (b.host != "") {
+		return a.host != ""
+	}
+
+	for i := 0; i < len(a.ranks) && i < len(b.ranks); i++ {
+
+		if a.ranks[i] != b.ranks[i] {
+			return a.ranks[i] > b.ranks[i]
+		}
+	}
+
+	if len(a.ranks) != len(b.ranks) {
+		return len(a.ranks) > len(b.ranks)
+	}
+
+	if a.pathLen != b.pathLen {
+		return a.pathLen > b.pathLen
+	}
+
+	if (a.method != "") != (b.method != "") {
+		return a.method != ""
+	}
+
+	return a.pattern < b.pattern
+}
+
+// normalizePath returns the request path with each segment unescaped, except that an escaped slash is
+// replaced by a placeholder so that it can't be mistaken for a segment boundary.
+func normalizePath(req *http.Request) string {
+
+	segments := strings.Split(req.URL.EscapedPath(), "/")
+
+	for i, s := range segments {
+
+		v, err := url.PathUnescape(s)
 
 		if err != nil {
-			return nil, fmt.Errorf("Failed to instantiate handler func for '%s' matching '%s', %v", path, matching_pattern, err)
+			v = s
 		}
 
-		handler = h
-		matches.Store(matching_pattern, handler)
+		segments[i] = strings.ReplaceAll(v, "/", slash_placeholder)
 	}
 
-	rsp := &deriveHandlerResults{
-		MatchingPattern: matching_pattern,
-		Handler:         handler,
-		PathValues:      path_values,
-		Method:          method,
-		Host:            host,
+	return strings.Join(segments, "/")
+}
+
+func stripPort(host string) string {
+
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
 	}
 
-	return rsp, nil
+	return host
 }

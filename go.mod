@@ -5,7 +5,7 @@ go 1.27.4
 require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/aaronland/go-roster/v2 v2.0.0
-	github.com/aaronland/go-string v1.0.1
+	github.com/aaronland/go-string v1.1.0
 	github.com/aaronland/gocloud v1.3.6
 	github.com/akrylysov/algnhsa v1.1.0
 	github.com/awnumar/memguard v0.23.0
