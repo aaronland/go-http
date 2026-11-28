@@ -2,10 +2,9 @@
 package rollup
 
 import (
+	"fmt"
 	"io/fs"
-	"log/slog"
 	"net/http"
-	"path/filepath"
 
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
@@ -17,51 +16,29 @@ type RollupCSSHandlerOptions struct {
 	FS fs.FS
 	// Paths maps the file name of a rollup file to the ordered list of CSS paths in FS that it combines.
 	Paths map[string][]string
+	// Cache indicates that each rollup file should be built once and then served from memory with an ETag.
+	// Changes to the underlying files are not picked up. The default is to rebuild the file on every request.
+	Cache bool
 }
 
 // RollupCSSHandler returns a handler that serves the CSS files listed in 'opts.Paths' for the requested file name,
-// minified and concatenated in order. It responds with a 404 if the file name is not a key in 'opts.Paths'.
+// minified and concatenated in order. It responds with a 404 if the file name is not a key in 'opts.Paths' and with
+// a 405 for any method other than GET or HEAD. It returns an error if 'opts' or 'opts.FS' is nil or if any path
+// in 'opts.Paths' does not exist in 'opts.FS'.
 func RollupCSSHandler(opts *RollupCSSHandlerOptions) (http.Handler, error) {
+
+	if opts == nil {
+		return nil, fmt.Errorf("Missing options")
+	}
 
 	m := minify.New()
 	m.AddFunc("text/css", css.Minify)
 
-	fn := func(rsp http.ResponseWriter, req *http.Request) {
+	h, err := newRollupHandler("CSS", opts.FS, opts.Paths, "text/css", m, "", opts.Cache)
 
-		path := req.URL.Path
-		fname := filepath.Base(path)
-
-		js_paths, exists := opts.Paths[fname]
-
-		if !exists {
-			http.Error(rsp, "Not found", http.StatusNotFound)
-			return
-		}
-
-		rsp.Header().Set("Content-type", "text/css")
-
-		for _, path := range js_paths {
-
-			r, err := opts.FS.Open(path)
-
-			if err != nil {
-				slog.Error("Failed to open CSS path for reading", "path", path, "error", err)
-				http.Error(rsp, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			defer r.Close()
-
-			err = m.Minify("text/css", rsp, r)
-
-			if err != nil {
-				slog.Error("Failed to minify CSS", "path", path, "error", err)
-				http.Error(rsp, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-
+	if err != nil {
+		return nil, err
 	}
 
-	return http.HandlerFunc(fn), nil
+	return h, nil
 }

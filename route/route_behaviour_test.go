@@ -96,7 +96,9 @@ func TestRouteConstraintsDoNotLeakBetweenPatterns(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if rsp := serve(t, h, "GET", "", "/b"); rsp.Code != 200 || rsp.Body.String() != "plain" {
+	rsp := serve(t, h, "GET", "", "/b")
+
+	if rsp.Code != 200 || rsp.Body.String() != "plain" {
 		t.Fatalf("got %d %q", rsp.Code, rsp.Body.String())
 	}
 }
@@ -118,7 +120,9 @@ func TestRoutePathValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if rsp := serve(t, h, "GET", "", "/things/42/children/abc"); rsp.Code != 200 {
+	rsp := serve(t, h, "GET", "", "/things/42/children/abc")
+
+	if rsp.Code != 200 {
 		t.Fatalf("got %d", rsp.Code)
 	}
 
@@ -127,7 +131,9 @@ func TestRoutePathValues(t *testing.T) {
 	}
 
 	// The wildcard pattern is anchored at the start so an unrelated prefix must not match.
-	if rsp := serve(t, h, "GET", "", "/other/things/42/children/abc"); rsp.Code != 404 {
+	rsp = serve(t, h, "GET", "", "/other/things/42/children/abc")
+
+	if rsp.Code != 404 {
 		t.Fatalf("expected 404 for unanchored path, got %d", rsp.Code)
 	}
 }
@@ -143,11 +149,15 @@ func TestRouteLongestPatternWins(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if rsp := serve(t, h, "GET", "", "/api/special"); rsp.Body.String() != "long" {
+	rsp := serve(t, h, "GET", "", "/api/special")
+
+	if rsp.Body.String() != "long" {
 		t.Fatalf("got %q", rsp.Body.String())
 	}
 
-	if rsp := serve(t, h, "GET", "", "/api/other"); rsp.Body.String() != "short" {
+	rsp = serve(t, h, "GET", "", "/api/other")
+
+	if rsp.Body.String() != "short" {
 		t.Fatalf("got %q", rsp.Body.String())
 	}
 }
@@ -226,7 +236,9 @@ func TestRouteSamePathDifferentMethods(t *testing.T) {
 		t.Errorf("got %d Allow=%q", rsp.Code, rsp.Header().Get("Allow"))
 	}
 
-	if rsp := serve(t, h, "GET", "", "/nope"); rsp.Code != 404 {
+	rsp = serve(t, h, "GET", "", "/nope")
+
+	if rsp.Code != 404 {
 		t.Errorf("got %d", rsp.Code)
 	}
 }
@@ -258,16 +270,22 @@ func TestRouteSpecificity(t *testing.T) {
 			"/x/1/2":     "ab",
 		} {
 
-			if rsp := serve(t, h, "GET", "", path); rsp.Body.String() != want {
+			rsp := serve(t, h, "GET", "", path)
+
+			if rsp.Body.String() != want {
 				t.Fatalf("%s: got %q, want %q", path, rsp.Body.String(), want)
 			}
 		}
 
-		if rsp := serve(t, h, "GET", "example.com:8080", "/h"); rsp.Body.String() != "host" {
+		rsp := serve(t, h, "GET", "example.com:8080", "/h")
+
+		if rsp.Body.String() != "host" {
 			t.Fatalf("got %q", rsp.Body.String())
 		}
 
-		if rsp := serve(t, h, "GET", "other.com", "/h"); rsp.Body.String() != "nohost" {
+		rsp = serve(t, h, "GET", "other.com", "/h")
+
+		if rsp.Body.String() != "nohost" {
 			t.Fatalf("got %q", rsp.Body.String())
 		}
 	}
@@ -285,11 +303,15 @@ func TestRouteEscapedSlashStaysInSegment(t *testing.T) {
 		},
 	})
 
-	if rsp := serve(t, h, "GET", "", "/u/a%2Fb"); rsp.Code != 200 || got != "a/b" {
+	rsp := serve(t, h, "GET", "", "/u/a%2Fb")
+
+	if rsp.Code != 200 || got != "a/b" {
 		t.Fatalf("got %d %q", rsp.Code, got)
 	}
 
-	if rsp := serve(t, h, "GET", "", "/u/a/b"); rsp.Code != 404 {
+	rsp = serve(t, h, "GET", "", "/u/a/b")
+
+	if rsp.Code != 404 {
 		t.Fatalf("got %d", rsp.Code)
 	}
 }
@@ -306,7 +328,9 @@ func TestRouteRestWildcard(t *testing.T) {
 		},
 	})
 
-	if rsp := serve(t, h, "GET", "", "/files/a/b.txt"); rsp.Code != 200 || got != "a/b.txt" {
+	rsp := serve(t, h, "GET", "", "/files/a/b.txt")
+
+	if rsp.Code != 200 || got != "a/b.txt" {
 		t.Fatalf("got %d %q", rsp.Code, got)
 	}
 }
@@ -325,16 +349,22 @@ func TestRouteInvalidPatterns(t *testing.T) {
 		"/x/{rest...}/more",
 		"/x/{$}/more",
 	} {
-		if _, err := RouteHandler(map[string]RouteHandlerFunc{p: tagHandler("x")}); err == nil {
+		_, err := RouteHandler(map[string]RouteHandlerFunc{p: tagHandler("x")})
+
+		if err == nil {
 			t.Errorf("expected an error for pattern %q", p)
 		}
 	}
 
-	if _, err := RouteHandler(map[string]RouteHandlerFunc{"/x": nil}); err == nil {
+	_, err := RouteHandler(map[string]RouteHandlerFunc{"/x": nil})
+
+	if err == nil {
 		t.Error("expected an error for a nil handler func")
 	}
 
-	if _, err := RouteHandlerWithOptions(nil); err == nil {
+	_, err = RouteHandlerWithOptions(nil)
+
+	if err == nil {
 		t.Error("expected an error for nil options")
 	}
 }
@@ -345,7 +375,9 @@ func TestRouteNilHandlerIs500(t *testing.T) {
 		"/nil": func(ctx context.Context) (http.Handler, error) { return nil, nil },
 	})
 
-	if rsp := serve(t, h, "GET", "", "/nil"); rsp.Code != 500 {
+	rsp := serve(t, h, "GET", "", "/nil")
+
+	if rsp.Code != 500 {
 		t.Fatalf("got %d", rsp.Code)
 	}
 }
@@ -369,7 +401,9 @@ func TestRouteHandlerInitializedOnce(t *testing.T) {
 		},
 	})
 
-	if rsp := serve(t, h, "GET", "", "/once"); rsp.Code != 500 {
+	rsp := serve(t, h, "GET", "", "/once")
+
+	if rsp.Code != 500 {
 		t.Fatalf("got %d", rsp.Code)
 	}
 
@@ -383,7 +417,9 @@ func TestRouteHandlerInitializedOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			if rsp := serve(t, h, "GET", "", "/once"); rsp.Code != 200 {
+			rsp := serve(t, h, "GET", "", "/once")
+
+			if rsp.Code != 200 {
 				t.Errorf("got %d", rsp.Code)
 			}
 		}()
@@ -391,7 +427,9 @@ func TestRouteHandlerInitializedOnce(t *testing.T) {
 
 	wg.Wait()
 
-	if n := calls.Load(); n != 1 {
+	n := calls.Load()
+
+	if n != 1 {
 		t.Fatalf("handler built %d times", n)
 	}
 }
@@ -408,7 +446,9 @@ func TestRouteHandlerFactoryError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if rsp := serve(t, h, "GET", "", "/broken"); rsp.Code != 500 {
+	rsp := serve(t, h, "GET", "", "/broken")
+
+	if rsp.Code != 500 {
 		t.Fatalf("expected 500, got %d", rsp.Code)
 	}
 }
@@ -436,13 +476,17 @@ func TestRouteDefaultIsPrefixMatching(t *testing.T) {
 		"/foo/other":     200,
 		"/nope":          404,
 	} {
-		if rsp := serve(t, h, "GET", "", path); rsp.Code != want {
+		rsp := serve(t, h, "GET", "", path)
+
+		if rsp.Code != want {
 			t.Errorf("%s: got %d, want %d", path, rsp.Code, want)
 		}
 	}
 
 	// A method mismatch on the most specific pattern is a 405, not a fallback to "/foo".
-	if rsp := serve(t, h, "GET", "", "/foo/post"); rsp.Code != 405 {
+	rsp := serve(t, h, "GET", "", "/foo/post")
+
+	if rsp.Code != 405 {
 		t.Errorf("got %d", rsp.Code)
 	}
 
@@ -452,7 +496,9 @@ func TestRouteDefaultIsPrefixMatching(t *testing.T) {
 		"/administrator": tagHandler("long"),
 	})
 
-	if rsp := serve(t, h2, "GET", "", "/administrator/x"); rsp.Body.String() != "long" {
+	rsp = serve(t, h2, "GET", "", "/administrator/x")
+
+	if rsp.Body.String() != "long" {
 		t.Errorf("got %q", rsp.Body.String())
 	}
 }

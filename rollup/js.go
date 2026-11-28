@@ -3,10 +3,7 @@ package rollup
 import (
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"net/http"
-	"path/filepath"
-	"regexp"
 
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/js"
@@ -18,59 +15,29 @@ type RollupJSHandlerOptions struct {
 	FS fs.FS
 	// Paths maps the file name of a rollup file to the ordered list of JavaScript paths in FS that it combines.
 	Paths map[string][]string
+	// Cache indicates that each rollup file should be built once and then served from memory with an ETag.
+	// Changes to the underlying files are not picked up. The default is to rebuild the file on every request.
+	Cache bool
 }
 
 // RollupJSHandler returns a handler that serves the JavaScript files listed in 'opts.Paths' for the requested file name,
-// minified and concatenated in order. It responds with a 404 if the file name is not a key in 'opts.Paths'.
+// minified and concatenated in order. It responds with a 404 if the file name is not a key in 'opts.Paths' and with
+// a 405 for any method other than GET or HEAD. It returns an error if 'opts' or 'opts.FS' is nil or if any path
+// in 'opts.Paths' does not exist in 'opts.FS'.
 func RollupJSHandler(opts *RollupJSHandlerOptions) (http.Handler, error) {
 
-	js_regexp, err := regexp.Compile("^(application|text)/(x-)?(java|ecma)script$")
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to compile JS pattern, %w", err)
+	if opts == nil {
+		return nil, fmt.Errorf("Missing options")
 	}
 
 	m := minify.New()
-	m.AddFuncRegexp(js_regexp, js.Minify)
+	m.AddFunc("text/javascript", js.Minify)
 
-	fn := func(rsp http.ResponseWriter, req *http.Request) {
+	h, err := newRollupHandler("JavaScript", opts.FS, opts.Paths, "text/javascript", m, ";", opts.Cache)
 
-		path := req.URL.Path
-		fname := filepath.Base(path)
-
-		js_paths, exists := opts.Paths[fname]
-
-		if !exists {
-			http.Error(rsp, "Not found", http.StatusNotFound)
-			return
-		}
-
-		rsp.Header().Set("Content-type", "text/javascript")
-
-		for _, path := range js_paths {
-
-			r, err := opts.FS.Open(path)
-
-			if err != nil {
-				slog.Error("Failed to open JavaScript file for reading", "path", path, "error", err)
-				http.Error(rsp, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			defer r.Close()
-
-			err = m.Minify("text/javascript", rsp, r)
-
-			if err != nil {
-				slog.Error("Failed to minify JavaScript file", "path", path, "error", err)
-				http.Error(rsp, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			rsp.Write([]byte(`;`))
-		}
-
+	if err != nil {
+		return nil, err
 	}
 
-	return http.HandlerFunc(fn), nil
+	return h, nil
 }

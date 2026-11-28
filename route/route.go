@@ -83,15 +83,19 @@ type route struct {
 // get returns the route's handler, initializing it on first use. A failed initialization is not cached.
 func (r *route) get(ctx context.Context) (http.Handler, error) {
 
-	if h := r.handler.Load(); h != nil {
-		return *h, nil
+	cached := r.handler.Load()
+
+	if cached != nil {
+		return *cached, nil
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if h := r.handler.Load(); h != nil {
-		return *h, nil
+	cached = r.handler.Load()
+
+	if cached != nil {
+		return *cached, nil
 	}
 
 	// A canceled first request must not poison the handler that every later request will share.
@@ -340,7 +344,9 @@ func compilePath(path string, end_anchored bool) (*regexp.Regexp, []string, erro
 			sb.WriteString("(.*)")
 			open_ended = true
 
-			if err := addKey(&keys, seen, name); err != nil {
+			err := addKey(&keys, seen, name)
+
+			if err != nil {
 				return nil, nil, err
 			}
 
@@ -348,7 +354,9 @@ func compilePath(path string, end_anchored bool) (*regexp.Regexp, []string, erro
 
 			sb.WriteString("([^/]+)")
 
-			if err := addKey(&keys, seen, name); err != nil {
+			err := addKey(&keys, seen, name)
+
+			if err != nil {
 				return nil, nil, err
 			}
 		}
@@ -476,7 +484,9 @@ func normalizePath(req *http.Request) string {
 
 func stripPort(host string) string {
 
-	if h, _, err := net.SplitHostPort(host); err == nil {
+	h, _, err := net.SplitHostPort(host)
+
+	if err == nil {
 		return h
 	}
 

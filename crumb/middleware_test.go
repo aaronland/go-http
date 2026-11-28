@@ -235,13 +235,16 @@ func TestEncryptedCrumbRejectsTampering(t *testing.T) {
 
 		b := []byte(token)
 
-		if b[i] == 'A' {
-			b[i] = 'B'
+		// The token is lowercase hex, so use characters that always differ from the original.
+		if b[i] == '0' {
+			b[i] = '1'
 		} else {
-			b[i] = 'A'
+			b[i] = '0'
 		}
 
-		if ok, _ := cr.Validate(req, string(b)); ok {
+		ok, _ := cr.Validate(req, string(b))
+
+		if ok {
 			t.Errorf("tampered crumb (position %d) validated", i)
 		}
 	}
